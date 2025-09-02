@@ -1,9 +1,8 @@
 import express from 'express';
 import path from 'path';
 import http from 'http';
-import WebSocket, { Server as WebSocketServer } from 'ws';
 import { setupWebSocketServer } from './realtime';
-
+import WebSocket, { WebSocketServer } from 'ws';
 const app = express();
 app.use(express.json()); // JSONボディをパースするためのミドルウェアを追加
 
@@ -69,7 +68,7 @@ setupWebSocketServer(wss);
 wss.on('connection', ws => {
   console.log('クライアントが接続しました。');
 
-  ws.on('message', message => {
+  ws.on('message', (message: WebSocket.RawData) => {
     // 受信したメッセージを処理
     console.log(`メッセージを受信: ${message}`);
     // ここにゲームのロジックを追加

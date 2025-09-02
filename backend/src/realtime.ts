@@ -1,6 +1,6 @@
 // /logic_SLG/backend/src/realtime.ts
 
-import { WebSocket, WebSocketServer } from 'ws';
+import WebSocket, { WebSocketServer } from 'ws';
 
 // ゲームの状態を管理するインターフェース
 interface GameState {
@@ -26,7 +26,7 @@ export const setupWebSocketServer = (wss: WebSocketServer) => {
     console.log('クライアントが接続しました。');
     ws.send(JSON.stringify({ type: 'welcome', payload: 'Welcome to the game!' }));
 
-    ws.on('message', message => {
+    ws.on('message', (message: WebSocket.RawData) => {
       try {
         const data = JSON.parse(message.toString());
 
