@@ -9,8 +9,6 @@ const port = process.env.PORT || 3000;
 
 app.use(express.json()); // JSONボディをパースするためのミドルウェア
 
-// === 1. APIエンドポイントを最初に定義 ===
-// すべてのAPIエンドポイントは、静的ファイルよりも前に処理される必要がある
 app.post('/api/rooms', async (req, res) => {
   try {
     let roomId = generateRoomId();
@@ -25,16 +23,15 @@ app.post('/api/rooms', async (req, res) => {
   }
 });
 
-// === 2. 静的ファイルの提供とフォールバック ===
+
 // 静的ファイルをホストする
 app.use(express.static(path.join(__dirname, '..', 'build')));
 
 // その他のすべてのリクエストに対して、`index.html`を返す
-app.get('*', (req, res) => {
+app.get('*',(req, res) => {
   res.sendFile(path.join(__dirname, '..', 'build', 'index.html'));
 });
 
-// === 3. サーバーの統合と起動 ===
 // HTTPサーバーを作成
 const server = http.createServer(app);
 // WebSocketサーバーのインスタンスを作成
@@ -47,7 +44,6 @@ server.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
 
-// === 4. 関数とインターフェースの定義 ===
 // 関数とインターフェースはファイルの先頭に置くのが一般的だが、動作には影響しない
 function generateRoomId(): string {
   const min = 10000;
