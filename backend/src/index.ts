@@ -28,8 +28,8 @@ app.post('/api/rooms', async (req, res) => {
 app.use(express.static(path.join(__dirname, '..', 'build')));
 
 // その他のすべてのリクエストに対して、`index.html`を返す
-app.get('*',(req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'build', 'index.html'));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '..','build','index.html'));
 });
 
 // HTTPサーバーを作成
