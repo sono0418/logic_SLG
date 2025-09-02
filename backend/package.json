@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "build": "cd ../frontend && npm run build && cp -r dist/ ../backend/",
+    "build": "cd ../frontend &&npm install && npm run build && cp -r dist/ ../backend/",
     "start": "ts-node src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
