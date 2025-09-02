@@ -1,35 +1,40 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import TitleScreen from './components/TitleScreen';
+import PopUpA from './components/Popups/PopUpA';
+import PopUpB from './components/Popups/PopUpB';
+import PopUpC from './components/Popups/PopUpC';
+import GamePage from './components/GamePage';
 
-function App() {
-  const [count, setCount] = useState(0)
+// ポップアップの種類を定義する
+type PopUpType = 'none' | 'A' | 'B' | 'C';
+const App: React.FC = () => {
 
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+// 状態の管理: 現在表示されているポップアップの種類
+const [currentPopUp, setCurrentPopUp] = useState<PopUpType>('none');
 
-export default App
+// ポップアップを閉じるための関数
+const handleClosePopUp = () => {
+  setCurrentPopUp('none');
+};
+
+return (
+  <Router>
+    <Routes>
+      <Route path="/" element={
+        <div>
+          <TitleScreen onOpenPopUp={setCurrentPopUp} />
+          {currentPopUp === 'A' && <PopUpA onClose={handleClosePopUp} />}
+          {currentPopUp === 'B' && <PopUpB onClose={handleClosePopUp} />}
+          {currentPopUp === 'C' && <PopUpC onClose={handleClosePopUp} />}
+        </div>
+      } />
+      <Route path="/game/:roomId" element={<GamePage />} />
+    </Routes>
+  </Router>
+);
+};
+
+
+
+export default App;
