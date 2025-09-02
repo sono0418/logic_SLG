@@ -18,7 +18,7 @@ const PopUpA: React.FC<PopUpProps> = ({ onClose }) => {
   const [error, setError] = useState<string | null>(null);
 
   // WebSocket接続を保持する状態
-  const [ws, setWs] = useState<WebSocket | null>(null);
+  const [_ws, setWs] = useState<WebSocket | null>(null);
 
   // ルーム作成ボタンがクリックされた時の処理
   const handleCreateRoom = async () => {
