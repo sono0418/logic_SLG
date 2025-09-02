@@ -307,6 +307,11 @@ convert-source-map@^2.0.0:
   resolved "https://registry.npmjs.org/convert-source-map/-/convert-source-map-2.0.0.tgz"
   integrity sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==
 
+create-vite@^7.1.1:
+  version "7.1.1"
+  resolved "https://registry.npmjs.org/create-vite/-/create-vite-7.1.1.tgz"
+  integrity sha512-9njjp5o1Sc+4XRpyARFillR+dNS0x50U8i2tB6H2KDKYAKWbntUcOOPcNJxTglAwd9nJxznq9K67kl3B/JkCZg==
+
 csstype@^3.0.2:
   version "3.1.3"
   resolved "https://registry.npmjs.org/csstype/-/csstype-3.1.3.tgz"
