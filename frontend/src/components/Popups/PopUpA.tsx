@@ -66,7 +66,8 @@ const PopUpA: React.FC<PopUpProps> = ({ onClose }) => {
     setError(null);
     try {
       // 1. HTTP APIでプレイヤーIDを取得
-      const response = await fetch(`/api/rooms/${inputRoomId}/join`, {
+      const BACKEND_URL = 'https://logic-slg.onrender.com';
+      const response = await fetch(`${BACKEND_URL}/api/rooms/${inputRoomId}/join`, {
         method: 'POST',
       });
       if (!response.ok) {
