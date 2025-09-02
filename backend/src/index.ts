@@ -3,7 +3,10 @@ import path from 'path';
 import http from 'http';
 import { setupWebSocketServer } from './realtime';
 import WebSocket, { WebSocketServer } from 'ws';
+
 const app = express();
+const port = process.env.PORT || 3000;
+
 app.use(express.json()); // JSONボディをパースするためのミドルウェアを追加
 
 // ランダムな5桁の数字を生成する関数
@@ -27,25 +30,23 @@ interface GameState {
 
 // gameRoomsマップを定義
 const gameRooms = new Map<string, GameState>();
+
 // ルーム作成APIの実装
 app.post('/api/rooms', async (req, res) => {
   try {
     let roomId = generateRoomId();
     // 重複をチェックするループ
     while (gameRooms.has(roomId)) {
-      roomId = generateRoomId();
+    roomId = generateRoomId();
     }
-
-    // データベースにルームを挿入（省略）
+    // TODO: データベースにルームを挿入（省略）
     // ...
-
     res.status(201).json({ roomId });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Failed to create room' });
   }
 });
-
 
 // Reactのビルドファイルをホストする
 app.use(express.static(path.join(__dirname, '..', 'build')));
@@ -63,28 +64,6 @@ const wss = new WebSocketServer({ server });
 
 // WebSocketのロジックをこのインスタンスに適用
 setupWebSocketServer(wss);
-
-// WebSocketサーバーのロジック
-wss.on('connection', ws => {
-  console.log('クライアントが接続しました。');
-
-  ws.on('message', (message: WebSocket.RawData) => {
-    // 受信したメッセージを処理
-    console.log(`メッセージを受信: ${message}`);
-    // ここにゲームのロジックを追加
-    ws.send(JSON.stringify({ type: 'message_response', payload: { text: 'メッセージを受信しました' } }));
-  });
-
-  ws.on('close', () => {
-    console.log('クライアントが切断しました。');
-  });
-
-  ws.on('error', error => {
-    console.error('WebSocketエラー:', error);
-  });
-});
-
-const port = process.env.PORT || 3000;
 
 // サーバーを起動
 server.listen(port, () => {
