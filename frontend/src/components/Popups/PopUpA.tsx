@@ -36,7 +36,7 @@ const PopUpA: React.FC<PopUpProps> = ({ onClose }) => {
       const { roomId, playerId } = data;
 
       // 2. WebSocket接続を確立
-      const newWs = new WebSocket('ws://localhost:8080');
+      const newWs = new WebSocket('wss://logic-slg.onrender.com/');
       newWs.onopen = () => {
         const message = {
           type: 'joinRoom',
@@ -76,7 +76,7 @@ const PopUpA: React.FC<PopUpProps> = ({ onClose }) => {
       const { playerId } = data;
 
       // 2. WebSocket接続を確立
-      const newWs = new WebSocket('ws://localhost:8080');
+      const newWs = new WebSocket('wss://logic-slg.onrender.com/');
       newWs.onopen = () => {
         const message = {
           type: 'joinRoom',
