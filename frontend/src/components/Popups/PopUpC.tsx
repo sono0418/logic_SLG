@@ -24,8 +24,7 @@ const PopUpC: React.FC<PopUpProps> = ({ onClose }) => {
       try {
         setIsLoading(true);
         // 実際にはここにAPI呼び出しのコードを記述します。
-        // 例: const response = await fetch('/api/scores');
-        // const data: PlayerScore[] = await response.json();
+        // 多分API作られてないからAIと相談してAPIつくるかうまいこと呼び出すかしよう
 
         // 今回はダミーデータを使います
         const mockData: PlayerScore[] = [
@@ -33,10 +32,9 @@ const PopUpC: React.FC<PopUpProps> = ({ onClose }) => {
           { id: 2, name: "Player B", score: 4500 },
           { id: 3, name: "Player C", score: 4800 },
         ];
-        
-        // スコアで降順にソート
         const sortedScores = mockData.sort((a, b) => b.score - a.score);
         setScores(sortedScores);
+        //ここまでダミー
       } catch (error) {
         console.error("データの取得に失敗しました", error);
       } finally {

@@ -8,5 +8,48 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000; /* ★ この値を十分に大きく設定 */
+  z-index: 1000; 
+}
+
+/* ポップアップのコンテンツ部分 */
+.popup-content {
+  background-color: #ffffff; /* ★ 背景色を白に設定 */
+  border: 2px solid #333333; /* ★ 2pxの実線で濃い灰色の囲み線 */
+  border-radius: 8px; /* 角を少し丸める */
+  padding: 30px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* 影を追加して立体感を出す */
+  width: 80%; /* 幅を画面の80%にする */
+  max-width: 500px; /* 最大幅を設定 */
+  text-align: center;
+}
+
+/* ポップアップ内のボタン */
+.popup-content button {
+  margin-top: 20px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  background-color: #007bff;
+  color: white;
+  cursor: pointer;
+}
+
+.popup-content button:hover {
+  background-color: #0056b3;
+}
+
+/* ポップアップの閉じるボタン（もしあれば） */
+.popup-close-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 1.5em;
+  cursor: pointer;
+  color: #555;
+}
+
+.popup-close-button:hover {
+  color: #000;
 }
