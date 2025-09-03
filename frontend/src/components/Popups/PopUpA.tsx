@@ -74,14 +74,14 @@ const PopUpA: React.FC<PopUpProps> = ({ onClose }) => {
       const response = await fetch(`${BACKEND_URL}/api/rooms/${inputRoomId}/join`, {
         method: 'POST',
       });*/
-      const response_playerId = await fetch('/api/rooms/${roomId}/join',{
+      const response_playerId = await fetch('/api/rooms/${inputRoomId}/join',{
         method: 'POST',
       });
       if (!response_playerId.ok) {
         throw new Error('Failed to join room. Room ID might be invalid.');
       }
       const { playerId } = await response_playerId.json();
-      
+
       // 2. WebSocket接続を確立
       const newWs = new WebSocket('wss://logic-slg.onrender.com/');
       newWs.onopen = () => {
