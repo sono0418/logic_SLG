@@ -32,7 +32,7 @@ const PopUpA: React.FC<PopUpProps> = ({ onClose }) => {
       const { roomId } = await response_roomId.json();
 
       // 2. HTTP API(api/rooms/roomId/join)でplayerIdを入手
-      const response_playerId = await fetch('/api/rooms/${roomId}/join',{
+      const response_playerId = await fetch('${BACKEND_URL}/api/rooms/${roomId}/join',{
         method: 'POST',
       });
       if (!response_roomId.ok) {
@@ -69,12 +69,7 @@ const PopUpA: React.FC<PopUpProps> = ({ onClose }) => {
   const handleJoinRoom = async () => {
     setIsLoading(true); setError(null);
     try {
-      // 1. HTTP APIでプレイヤーIDを取得
-      /*const BACKEND_URL = 'https://logic-slg.onrender.com';
-      const response = await fetch(`${BACKEND_URL}/api/rooms/${inputRoomId}/join`, {
-        method: 'POST',
-      });*/
-      const response_playerId = await fetch('/api/rooms/${inputRoomId}/join',{
+      const response_playerId = await fetch('${BACKEND_URL}/api/rooms/${inputRoomId}/join',{
         method: 'POST',
       });
       if (!response_playerId.ok) {
