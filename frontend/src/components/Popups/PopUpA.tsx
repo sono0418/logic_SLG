@@ -1,5 +1,4 @@
 // src/components/Popups/PopUpA.tsx
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -9,31 +8,37 @@ interface PopUpProps {
 }
 
 const PopUpA: React.FC<PopUpProps> = ({ onClose }) => {
-  // React Routerのナビゲーションフック
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // React Routerのナビゲーションフック
 
   // ルーム入室用の入力値と、APIから受け取ったIDを管理する状態
   const [inputRoomId, setInputRoomId] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // WebSocket接続を保持する状態
-  const [_ws, setWs] = useState<WebSocket | null>(null);
+  const [_ws, setWs] = useState<WebSocket | null>(null); // WebSocket接続を保持する状態
 
-  // ルーム作成ボタンがクリックされた時の処理
+  // ルーム作成処理
   const handleCreateRoom = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      // 1. HTTP APIでルームを作成
-      const response = await fetch('/api/rooms', {
+      // 1. HTTP API(api/rooms)でルームを作成
+      const response_roomId = await fetch('/api/rooms', {
         method: 'POST',
       });
-      if (!response.ok) {
+      if (!response_roomId.ok) {
         throw new Error('Failed to create room.');
       }
-      const data = await response.json();
-      const { roomId, playerId } = data;
+      const { roomId } = await response_roomId.json();
+
+      // 2. HTTP API(api/rooms/roomId/join)でplayerIdを入手
+      const response_playerId = await fetch('/api/rooms/${roomId}/join',{
+        method: 'POST',
+      });
+      if (!response_roomId.ok) {
+        throw new Error('Failed to join room after creation');
+      }
+      const { playerId } = await response_playerId.json();
 
       // 2. WebSocket接続を確立
       const newWs = new WebSocket('wss://logic-slg.onrender.com/');
@@ -60,22 +65,23 @@ const PopUpA: React.FC<PopUpProps> = ({ onClose }) => {
     }
   };
 
-  // ルーム入室ボタンがクリックされた時の処理
+  // ルームIDから入室する処理
   const handleJoinRoom = async () => {
-    setIsLoading(true);
-    setError(null);
+    setIsLoading(true); setError(null);
     try {
       // 1. HTTP APIでプレイヤーIDを取得
-      const BACKEND_URL = 'https://logic-slg.onrender.com';
+      /*const BACKEND_URL = 'https://logic-slg.onrender.com';
       const response = await fetch(`${BACKEND_URL}/api/rooms/${inputRoomId}/join`, {
         method: 'POST',
+      });*/
+      const response_playerId = await fetch('/api/rooms/${roomId}/join',{
+        method: 'POST',
       });
-      if (!response.ok) {
+      if (!response_playerId.ok) {
         throw new Error('Failed to join room. Room ID might be invalid.');
       }
-      const data = await response.json();
-      const { playerId } = data;
-
+      const { playerId } = await response_playerId.json();
+      
       // 2. WebSocket接続を確立
       const newWs = new WebSocket('wss://logic-slg.onrender.com/');
       newWs.onopen = () => {
@@ -93,7 +99,6 @@ const PopUpA: React.FC<PopUpProps> = ({ onClose }) => {
 
       // 3. ページを遷移
       navigate(`/game/${inputRoomId}`);
-
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred.');
     } finally {
