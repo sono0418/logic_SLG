@@ -13,6 +13,6 @@ app.use(express.json());
 app.use('/api', apiRouter);
 
 // 静的ファイルをホストする
-app.use(express.static(path.join(__dirname, '..', 'build')));
+app.use(express.static(path.join(__dirname, '..', '..', 'build')));
 
 export default app;
