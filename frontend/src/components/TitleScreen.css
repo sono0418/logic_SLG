@@ -1,0 +1,79 @@
+/*
+flex-direction: row;    縦:column 横:row コンテンツを並べる向き 
+{justify-content: center;   flex-start:開始位置揃え
+ align-items: center;}      flex-end:終了位置揃え
+                            center:垂直方向の中央揃え 
+gap: 20px;      コンテンツ間の間隔を設定 
+width: 100%;    コンテンツの幅を固定 
+*/
+
+.title-screen {
+  background-color: #E5DECA;
+  min-height: 100vh; /* 画面全体の高さを確保 */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start; 
+  align-items: flex-start;
+  padding: 50px;
+}
+
+/* ページタイトル (h1) のスタイル */
+.title-screen h1 {
+  margin-top: 0;
+  margin-bottom: 0;
+  color: #470000;
+  font-weight: 900;
+  font-size: 1000%;
+}
+
+/* ボタンをまとめるコンテナ */
+.button {
+  display: flex;
+  flex-direction: row; 
+  gap: 10px; 
+  width: 70%; 
+  height: 100%;
+}
+
+.small-button {
+  display: flex;
+  flex-direction: column; 
+  gap: 10px;
+  width: 300px;
+  height: 100%; 
+}
+
+/* 「はじめる」ボタンの背景色 */
+.button button:nth-child(1) {
+  border-radius: 5px;
+  background-color: #C77665; 
+  border-color: #470000;
+  width: 500px;
+  height: 300px;
+  font-size: 100px;
+}
+
+/* ノートボタンの背景色 */
+.small-button button:nth-child(1) {
+  border-radius: 5px;
+  background-color: #7E9374;
+  border-color: #470000;
+  width: 300px;
+  height: 145px;
+  font-size: 75px;
+}
+
+/* ランキングボタンの背景色 */
+.small-button button:nth-child(2) {
+  border-radius: 5px;
+  background-color: #729CA6;
+  border-color: #470000;
+  width: 300px;
+  height: 145px;
+  font-size: 50px;
+}
+
+.button button:hover,
+.small-button button:hover {
+  filter: brightness(0.9); /* ホバーで少し暗くする */
+}

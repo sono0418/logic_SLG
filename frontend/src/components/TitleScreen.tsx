@@ -1,5 +1,7 @@
+//frontend/src/components/TitleScreen.tsx
 import React from "react";
 import Button from './UI/Button';
+import './TitleScreen.css'; 
 
 //Popsの型を定義
 interface TitleScreenPops{
@@ -8,11 +10,15 @@ interface TitleScreenPops{
 
 const TitleScreen: React.FC<TitleScreenPops> = ({ onOpenPopUp}) => {
   return (
-    <div>
-      <h1>論理回路のゲーム</h1>
-      <Button onClick={() => onOpenPopUp('A')}>はじめる</Button>
-      <Button onClick={() => onOpenPopUp('B')}>ノート</Button>
-      <Button onClick={() => onOpenPopUp('C')}>ランキング</Button>
+    <div className="title-screen">
+      <h1>論理回路の<br></br>ゲーム</h1>
+      <div className="button">
+        <Button onClick={() => onOpenPopUp('A')}>はじめる</Button>
+        <div className="small-button">
+          <Button onClick={() => onOpenPopUp('B')}>ノート</Button>
+          <Button onClick={() => onOpenPopUp('C')}>ランキング</Button>
+        </div>
+      </div>
     </div>
   );
 };
