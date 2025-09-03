@@ -2,21 +2,26 @@
 import pg, { PoolClient } from 'pg';
 
 const pool = new pg.Pool({
-    // 環境変数からデータベースの接続URLを読み込む
-    connectionString: process.env.DATABASE_URL, 
-    // Render上のPostgreSQLはSSL接続が必須
+    connectionString: process.env.DATABASE_URL,
     ssl: {
         rejectUnauthorized: false,
     },
 });
 
 // 接続テストとログ出力
-pool.connect((err: Error, client: PoolClient, release: () => void) => {
+// ライブラリが期待する型に合わせて引数を修正
+pool.connect((err: Error | undefined, client: PoolClient | undefined, done: (release?: any) => void) => {
     if (err) {
-        return console.error('データベースへの接続中にエラーが発生しました:', err.stack);
+        console.error('データベースへの接続中にエラーが発生しました:', err.stack);
+    } else {
+        console.log('データベースに正常に接続しました ');
     }
-    console.log('データベースに正常に接続しました 🎉');
-    release(); 
+    
+    // 成功・失敗にかかわらず、クライアントは必ずプールに返却します
+    // これをしないと接続がプールに戻らず、いずれ接続できなくなります
+    if (done) {
+        done();
+    }
 });
 
 export default pool;
