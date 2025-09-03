@@ -1,3 +1,5 @@
+// この行を追加して、データベース接続ファイルを実行させます
+import './db/index'; 
 import express from 'express';
 import path from 'path';
 import http from 'http';
