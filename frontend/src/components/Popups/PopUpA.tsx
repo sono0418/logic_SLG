@@ -35,7 +35,7 @@ const PopUpA: React.FC<PopUpProps> = ({ onClose }) => {
       const response_playerId = await fetch(`${BACKEND_URL}/api/rooms/${roomId}/join`,{
         method: 'POST',
       });
-      if (!response_roomId.ok) {
+      if (!response_playerId.ok) {
         throw new Error('Failed to join room after creation');
       }
       const { playerId } = await response_playerId.json();
