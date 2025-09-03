@@ -1,6 +1,7 @@
 // src/components/Popups/PopUpA.tsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import './PopUp.css';
 const BACKEND_URL = 'https://logic-slg.onrender.com';
 // 親から渡されるPropsの型を定義
 interface PopUpProps {
