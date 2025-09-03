@@ -1,7 +1,7 @@
 // src/components/Popups/PopUpA.tsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-const BACKEND_URL = 'https://logic-slg.onrender.com';
+//const BACKEND_URL = 'https://logic-slg.onrender.com/';
 // 親から渡されるPropsの型を定義
 interface PopUpProps {
   onClose: () => void;
@@ -32,7 +32,7 @@ const PopUpA: React.FC<PopUpProps> = ({ onClose }) => {
       const { roomId } = await response_roomId.json();
 
       // 2. HTTP API(api/rooms/roomId/join)でplayerIdを入手
-      const response_playerId = await fetch(`${BACKEND_URL}/api/rooms/${roomId}/join`,{
+      const response_playerId = await fetch(`/api/rooms/${roomId}/join`,{
         method: 'POST',
       });
       if (!response_roomId.ok) {
@@ -69,7 +69,7 @@ const PopUpA: React.FC<PopUpProps> = ({ onClose }) => {
   const handleJoinRoom = async () => {
     setIsLoading(true); setError(null);
     try {
-      const response_playerId = await fetch(`${BACKEND_URL}/api/rooms/${inputRoomId}/join`,{
+      const response_playerId = await fetch(`/api/rooms/${inputRoomId}/join`,{
         method: 'POST',
       });
       if (!response_playerId.ok) {
