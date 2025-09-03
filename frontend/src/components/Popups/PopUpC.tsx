@@ -48,6 +48,9 @@ const PopUpC: React.FC<PopUpProps> = ({ onClose }) => {
   return (
     <div className="popup-overlay">
       <div className="popup-content">
+        <button className="popup-close-button" onClick={onClose}>
+          &times;
+        </button>
         <h2>ランキング</h2>
         {isLoading ? (
           <p>ランキングを読み込み中...</p>
@@ -60,7 +63,6 @@ const PopUpC: React.FC<PopUpProps> = ({ onClose }) => {
             ))}
           </ol>
         )}
-        <button onClick={onClose}>閉じる</button>
       </div>
     </div>
   );

@@ -108,30 +108,28 @@ const PopUpA: React.FC<PopUpProps> = ({ onClose }) => {
         <button className="popup-close-button" onClick={onClose}>
           &times;
         </button>
-
         <h2>マルチプレイ</h2>
-
-        <div>
-          <h3>ルーム作成</h3>
-          <button onClick={handleCreateRoom} disabled={isLoading}>
-            {isLoading ? '作成中...' : '作成'}
-          </button>
+        <div className = "PopupA">
+          <div className='content-left'>
+            <h3>ルーム作成</h3>
+            <button className='redbutton' onClick={handleCreateRoom} disabled={isLoading}>
+              {isLoading ? '作成中...' : '作成'}
+            </button>
+          </div>
+          <div className='content-right'>
+            <h3>ルーム入室</h3>
+            <input
+              type="text"
+              placeholder="ルームID"
+              value={inputRoomId}
+              onChange={(e) => setInputRoomId(e.target.value)}
+              disabled={isLoading}
+            />
+            <button className='bluebutton' onClick={handleJoinRoom} disabled={isLoading || !inputRoomId}>
+              {isLoading ? '入室中...' : '入室'}
+            </button>
+          </div>
         </div>
-
-        <div>
-          <h3>ルーム入室</h3>
-          <input
-            type="text"
-            placeholder="ルームID"
-            value={inputRoomId}
-            onChange={(e) => setInputRoomId(e.target.value)}
-            disabled={isLoading}
-          />
-          <button onClick={handleJoinRoom} disabled={isLoading || !inputRoomId}>
-            {isLoading ? '入室中...' : '入室'}
-          </button>
-        </div>
-
         {error && <p style={{ color: 'red' }}>エラー: {error}</p>}
       </div>
     </div>

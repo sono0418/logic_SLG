@@ -32,20 +32,21 @@ const PopUpB: React.FC<PopUpProps> = ({ onClose }) => {
   return (
     <div className="popup-overlay">
       <div className="popup-content">
+        <button className="popup-close-button" onClick={onClose}>
+          &times;
+        </button>
         <h2>ノート</h2>
         <p>{notePages[currentPage]}</p>
 
         <div>
-          <button onClick={handlePrevPage} disabled={currentPage === 0}>
+          <button className='redbutton' onClick={handlePrevPage} disabled={currentPage === 0}>
             左へ
           </button>
           <span> {currentPage + 1} / {notePages.length} </span>
-          <button onClick={handleNextPage} disabled={currentPage === notePages.length - 1}>
+          <button className='bluebutton' onClick={handleNextPage} disabled={currentPage === notePages.length - 1}>
             右へ
           </button>
         </div>
-        
-        <button onClick={onClose}>閉じる</button>
       </div>
     </div>
   );
