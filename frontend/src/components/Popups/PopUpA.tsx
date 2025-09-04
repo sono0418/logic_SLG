@@ -30,6 +30,18 @@ const PopUpA: React.FC<PopUpProps> = ({ onClose }) => {
     }
   };
 
+  //テキストペースト処理
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      setInputRoomId(text);
+    } catch (err) {
+      console.error('クリップボードの読み取りに失敗しました: ', err);
+      // ユーザーに何らかのフィードバックを返すこともできます
+      alert('ペーストに失敗しました。');
+    }
+  };
+
   return (
     <div className="popup-overlay">
       <div className="popup-content">
@@ -46,12 +58,15 @@ const PopUpA: React.FC<PopUpProps> = ({ onClose }) => {
           </div>
           <div className='content-right'>
             <h3>ルーム入室</h3>
-            <input
-              type="text"
-              placeholder="ルームID"
-              value={inputRoomId}
-              onChange={(e) => setInputRoomId(e.target.value)}
-            />
+            <div className = "input-with-button">
+              <input
+                type="text"
+                placeholder="ルームID"
+                value={inputRoomId}
+                onChange={(e) => setInputRoomId(e.target.value)}
+              />
+              <button className='paste-button' onClick={handlePaste}>貼付</button>
+            </div>
             <button className='bluebutton' onClick={handleJoinRoom} disabled={!inputRoomId.trim()}>
               入室
             </button>
