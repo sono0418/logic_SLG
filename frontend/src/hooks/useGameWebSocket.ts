@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { RoomState, GameState } from '../types'; // 型定義ファイルをインポート
 
-const WEBSOCKET_URL = 'ws://[your-domain]/'; // 例: 'ws://localhost:8080'
+const WEBSOCKET_URL = 'wss://logic-slg.onrender.com'; 
 
 export const useGameWebSocket = (roomId: string, playerId: string) => {
   const [roomState, setRoomState] = useState<RoomState | null>(null);
