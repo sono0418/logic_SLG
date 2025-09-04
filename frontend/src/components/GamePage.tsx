@@ -1,14 +1,15 @@
 // src/components/GamePage.tsx
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react'; 
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGameWebSocket } from '../hooks/useGameWebSocket';
+import { PlayerIdContext } from '../contexts/PlayerIdContext'; 
 import PopUpB from './Popups/PopUpB';
 import PopUpC from './Popups/PopUpC';
 // import './GamePage.css';
 
 const GamePage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
-  const myPlayerId = 'player-1'; 
+  const myPlayerId = useContext(PlayerIdContext);
   const maxPlayers = 4;
   const { roomState, sendMessage } = useGameWebSocket(roomId!, myPlayerId);
   //ポップアップ用の
@@ -16,6 +17,11 @@ const GamePage: React.FC = () => {
   const [isNotePopupOpen, setNotePopupOpen] = useState(false);
   const [isRankingPopupOpen, setRankingPopupOpen] = useState(false);
 
+    // myPlayerIdがまだ読み込めていない場合はローディング表示
+  if (!myPlayerId || !roomState) {
+    return <div>ルーム情報を読み込み中...</div>;
+  }
+  
   // ... (handle functions are the same) ...
   const handleSelectMode = (mode: 'tutorial' | 'timeAttack' | 'circuitPrediction') => {
     sendMessage('selectGameMode', { roomId, playerId: myPlayerId, mode });
