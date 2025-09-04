@@ -8,51 +8,47 @@ import apiRouter from './routes/api'; // api.tsからルーターをインポー
 import { setupWebSocketServer } from './realtime';
 import WebSocket, { WebSocket as WsWebSocket } from "ws";
 
-type Player = {
-  playerId: string;
-  ws: WsWebSocket; // DOM WebSocket と区別
-  score: number;
-};
+const tutorialCircuits = [
+  { circuit: ['AND', 'NOT'], expectedOutput: false, isTutorial: true },
+  { circuit: ['OR', 'AND'], expectedOutput: true, isTutorial: true },
+  { circuit: ['OR', 'NOT', 'AND'], expectedOutput: false, isTutorial: true }
+];
+
 // ゲームの状態を管理するインターフェースを定義
 interface GameState {
   roomId: string;
   players: { playerId: string, ws: WebSocket, playerOrder: number }[];
-  currentPlayerId: string | null; // 現在のターンプレイヤーのID
+  currentPlayerId: string | null;
   roundCount: number;
   teamScore: number;
   currentQuestion: {
     circuit: string[];
     expectedOutput: boolean;
+    isTutorial?: boolean; // isTutorialプロパティを追加
   };
   currentPlayerIndex: number;
   playerInputs: (boolean | null)[];
   status: 'waiting' | 'inProgress' | 'ended';
-  playerChoices: { [playerId: string]: string }; // プレイヤーIDと希望モードのマップ
-  hostId: string | null; // ホストのID
+  playerChoices: { [playerId: string]: string };
+  hostId: string | null;
 }
 
-// gameRoomsマップを定義
 const gameRooms = new Map<string, GameState>();
 const app = express();
 const port = process.env.PORT || 3000;
+
 function generateRoomId(): string {
   const min = 10000;
   const max = 99999;
   return Math.floor(Math.random() * (max - min + 1) + min).toString();
 }
 
-// ルーム作成APIの実装
 app.post('/api/rooms', async (req, res) => {
   try {
     let roomId = generateRoomId();
-    // 重複をチェックするループ
     while (gameRooms.has(roomId)) {
       roomId = generateRoomId();
     }
-
-    // データベースにルームを挿入（省略）
-    // ...
-
     res.status(201).json({ roomId });
   } catch (error) {
     console.error(error);
@@ -60,35 +56,15 @@ app.post('/api/rooms', async (req, res) => {
   }
 });
 app.use(express.json());
-
-// APIエンドポイントをルーター経由で設定
 app.use('/api', apiRouter);
-
-// ルーム作成APIが重複しているため、index.tsから削除
-
-// 静的ファイルをホストする
 app.use(express.static(path.join(__dirname, '..', 'dist')));
-
-// その他のすべてのリクエストに対して、`index.html`を返す
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
 });
 
-// HTTPサーバーを作成
 const server = http.createServer(app);
-// WebSocketサーバーのインスタンスを作成
 const wss = new WebSocketServer({ server });
-// WebSocketのロジックをこのインスタンスに適用
-setupWebSocketServer(wss);
-// wss.on('message', ...) ハンドラ内
 
-// サーバーを起動
-server.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
-// wss.on('connection', ws => { ...
-// ws.on('message', ... はこの中にネストされます
-// GameStateインターフェースにstatusプロパティを追加
 wss.on('connection', ws => {
   console.log('Client connected.');
 
@@ -130,7 +106,7 @@ wss.on('connection', ws => {
       }
       
       else if (data.type === 'startGame') {
-        const { roomId, playerId } = data.payload;
+        const { roomId, playerId, mode } = data.payload; // modeプロパティを追加
         const room = gameRooms.get(roomId);
 
         if (!room || room.players[0].playerId !== playerId || room.players.length < 2 || room.status === 'inProgress') {
@@ -138,9 +114,17 @@ wss.on('connection', ws => {
         }
 
         room.status = 'inProgress';
-        room.currentQuestion = { circuit: ['AND', 'OR'], expectedOutput: true };
+        room.roundCount = 0;
         room.currentPlayerIndex = 0;
         room.currentPlayerId = room.players[0].playerId;
+
+        // ここでモードに応じて問題を初期化
+        if (mode === 'tutorial') {
+          room.currentQuestion = tutorialCircuits[0];
+        } else {
+          room.currentQuestion = generateNewQuestion();
+        }
+        room.playerInputs = new Array(room.players.length).fill(null);
 
         room.players.forEach(p => {
           p.ws.send(JSON.stringify({ 
@@ -151,6 +135,7 @@ wss.on('connection', ws => {
               currentPlayerId: room.currentPlayerId,
               players: room.players.map(p => ({ id: p.playerId, playerOrder: p.playerOrder })),
               teamScore: room.teamScore,
+              mode: mode,
             }
           }));
         });
@@ -186,38 +171,73 @@ wss.on('connection', ws => {
           }
           
           room.roundCount++;
-          if (room.roundCount >= 3) {
-            room.status = 'ended';
-            room.players.forEach(p => {
-              p.ws.send(JSON.stringify({
-                type: 'gameEnd',
-                payload: {
-                  isCorrect,
-                  finalOutput: currentOutput,
-                  expectedOutput: room.currentQuestion.expectedOutput,
-                  finalTeamScore: room.teamScore,
-                }
-              }));
-            });
-            gameRooms.delete(roomId);
-          } else {
-            const newQuestion = generateNewQuestion();
-            room.currentQuestion = newQuestion;
-            room.currentPlayerIndex = 0;
-            room.currentPlayerId = room.players[0].playerId;
-            room.playerInputs = new Array(room.players.length).fill(null);
 
-            room.players.forEach(p => {
-              p.ws.send(JSON.stringify({
-                type: 'nextRound',
-                payload: {
-                  roundCount: room.roundCount,
-                  currentQuestion: room.currentQuestion,
-                  updatedTeamScore: room.teamScore,
-                }
-              }));
-            });
+          // チュートリアルモードの場合
+          if (room.currentQuestion.isTutorial) {
+            if (room.roundCount < tutorialCircuits.length) {
+              // 次のチュートリアル問題を出題
+              room.currentQuestion = tutorialCircuits[room.roundCount];
+              room.currentPlayerIndex = 0;
+              room.currentPlayerId = room.players[0].playerId;
+              room.playerInputs = new Array(room.players.length).fill(null);
+
+              room.players.forEach(p => {
+                p.ws.send(JSON.stringify({
+                  type: 'nextRound',
+                  payload: {
+                    roundCount: room.roundCount,
+                    currentQuestion: room.currentQuestion,
+                    updatedTeamScore: room.teamScore,
+                  }
+                }));
+              });
+            } else {
+              // チュートリアル終了
+              room.status = 'ended';
+              room.players.forEach(p => {
+                p.ws.send(JSON.stringify({ 
+                  type: 'gameEnd',
+                  payload: { message: 'Tutorial complete!', finalTeamScore: room.teamScore }
+                }));
+              });
+              gameRooms.delete(roomId);
+            }
+          } else {
+            // 通常モードの場合
+            if (room.roundCount >= 3) {
+              room.status = 'ended';
+              room.players.forEach(p => {
+                p.ws.send(JSON.stringify({
+                  type: 'gameEnd',
+                  payload: {
+                    isCorrect,
+                    finalOutput: currentOutput,
+                    expectedOutput: room.currentQuestion.expectedOutput,
+                    finalTeamScore: room.teamScore,
+                  }
+                }));
+              });
+              gameRooms.delete(roomId);
+            } else {
+              const newQuestion = generateNewQuestion();
+              room.currentQuestion = newQuestion;
+              room.currentPlayerIndex = 0;
+              room.currentPlayerId = room.players[0].playerId;
+              room.playerInputs = new Array(room.players.length).fill(null);
+  
+              room.players.forEach(p => {
+                p.ws.send(JSON.stringify({
+                  type: 'nextRound',
+                  payload: {
+                    roundCount: room.roundCount,
+                    currentQuestion: room.currentQuestion,
+                    updatedTeamScore: room.teamScore,
+                  }
+                }));
+              });
+            }
           }
+
         } else {
           room.currentPlayerIndex++;
           room.currentPlayerId = room.players[room.currentPlayerIndex].playerId;
