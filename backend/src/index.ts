@@ -42,8 +42,15 @@ function generateRoomId(): string {
   return Math.floor(Math.random() * (max - min + 1) + min).toString();
 }
 
+// ここから消さないで！！！！//////////////////
 app.use(express.json());
-// ルーティングや静的ファイルの提供ロジックは省略
+const staticPath = path.join(__dirname, '..', 'dist');
+app.use(express.static(staticPath));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(staticPath, 'index.html'));
+});
+//ここまで///////////////////////////////////
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
