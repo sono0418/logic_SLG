@@ -48,27 +48,7 @@ const PopUpC: React.FC<PopUpProps> = ({ onClose }) => {
   }, []); // 依存配列が空なので、コンポーネントが最初に表示された時（マウント時）に一度だけ実行される
 
 // 例: ranking.ts (APIエンドポイントのファイル)
-import express, { Request, Response } from 'express';
-import { getDbConnection } from './db'; // データベース接続関数をインポート
 
-const router = express.Router();
-
-router.get('/ranking', async (req: Request, res: Response) => {
-  let connection;
-  try {
-    connection = await getDbConnection();
-    // スコアの降順（高い順）でデータを取得するSQLクエリ
-    const [rows] = await connection.execute('SELECT player_name, score FROM Players ORDER BY score DESC');
-    
-    // 取得したデータをJSONとして返す
-    res.json(rows);
-  } catch (error) {
-    console.error('Failed to fetch ranking:', error);
-    res.status(500).json({ message: 'ランキングの取得に失敗しました' });
-  } finally {
-    if (connection) connection.release();
-  }
-});
 
 
   return (
