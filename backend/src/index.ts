@@ -140,7 +140,7 @@ wss.on('connection', ws => {
         room.status = 'inProgress';
         room.currentQuestion = { circuit: ['AND', 'OR'], expectedOutput: true };
         room.currentPlayerIndex = 0;
-        room.currentPlayerId = room.players[0].playerId;
+        room.currentPlayerId = room.players[0].playerId; //a
 
         room.players.forEach(p => {
           p.ws.send(JSON.stringify({ 
