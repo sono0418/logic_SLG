@@ -16,9 +16,10 @@ type Player = {
 // ゲームの状態を管理するインターフェースを定義
 interface GameState {
   roomId: string;
-  players: { playerId: string, ws: WebSocket, score: number }[];
+  players: { playerId: string, ws: WebSocket, playerOrder: number }[];
   currentPlayerId: string | null; // 現在のターンプレイヤーのID
   roundCount: number;
+  teamScore: number;
   currentQuestion: {
     circuit: string[];
     expectedOutput: boolean;
@@ -26,6 +27,8 @@ interface GameState {
   currentPlayerIndex: number;
   playerInputs: (boolean | null)[];
   status: 'waiting' | 'inProgress' | 'ended';
+  playerChoices: { [playerId: string]: string }; // プレイヤーIDと希望モードのマップ
+  hostId: string | null; // ホストのID
 }
 
 // gameRoomsマップを定義
@@ -93,7 +96,6 @@ wss.on('connection', ws => {
     try {
       const data = JSON.parse(message.toString());
 
-      // 'joinRoom' メッセージを処理
       if (data.type === 'joinRoom') {
         const { roomId, playerId } = data.payload;
         let room = gameRooms.get(roomId);
@@ -108,12 +110,18 @@ wss.on('connection', ws => {
             status: 'waiting',
             currentPlayerId: null,
             roundCount: 0,
+            teamScore: 0,
+            playerChoices: {},
+            hostId: playerId,
           };
           gameRooms.set(roomId, newRoom);
           room = newRoom;
           console.log(`New room ${roomId} created with status: ${room.status}`);
         }
-        room.players.push({ playerId, ws, score: 0 });
+        
+        const playerOrder = room.players.length + 1;
+        room.players.push({ playerId, ws, playerOrder });
+        
         console.log(`Player ${playerId} joined room ${roomId}`);
         ws.send(JSON.stringify({ type: 'joinSuccess', payload: { roomId, playerId } }));
         room.players.forEach(p => {
@@ -121,7 +129,6 @@ wss.on('connection', ws => {
         });
       }
       
-      // 'startGame' メッセージを処理
       else if (data.type === 'startGame') {
         const { roomId, playerId } = data.payload;
         const room = gameRooms.get(roomId);
@@ -142,14 +149,14 @@ wss.on('connection', ws => {
               currentQuestion: room.currentQuestion, 
               currentPlayerIndex: room.currentPlayerIndex,
               currentPlayerId: room.currentPlayerId,
-              players: room.players.map(p => ({ id: p.playerId, score: p.score }))
+              players: room.players.map(p => ({ id: p.playerId, playerOrder: p.playerOrder })),
+              teamScore: room.teamScore,
             }
           }));
         });
         console.log(`Game started in room ${roomId}. Status: ${room.status}`);
       }
       
-      // 'playerInput' メッセージを処理
       else if (data.type === 'playerInput') {
         const { roomId, playerId, inputValue } = data.payload;
         const room = gameRooms.get(roomId);
@@ -161,7 +168,6 @@ wss.on('connection', ws => {
         room.playerInputs[room.currentPlayerIndex] = inputValue;
 
         if (room.currentPlayerIndex === room.players.length - 1) {
-          // --- 最終評価とスコアリング ---
           let currentOutput = room.playerInputs[0] as boolean;
           for (let i = 1; i < room.playerInputs.length; i++) {
             const gateType = room.currentQuestion.circuit[i - 1];
@@ -176,7 +182,7 @@ wss.on('connection', ws => {
           }
           const isCorrect = currentOutput === room.currentQuestion.expectedOutput;
           if (isCorrect) {
-            room.players.forEach(p => p.score += 10);
+            room.teamScore += 10;
           }
           
           room.roundCount++;
@@ -189,7 +195,7 @@ wss.on('connection', ws => {
                   isCorrect,
                   finalOutput: currentOutput,
                   expectedOutput: room.currentQuestion.expectedOutput,
-                  players: room.players.map(player => ({ id: player.playerId, score: player.score }))
+                  finalTeamScore: room.teamScore,
                 }
               }));
             });
@@ -207,13 +213,12 @@ wss.on('connection', ws => {
                 payload: {
                   roundCount: room.roundCount,
                   currentQuestion: room.currentQuestion,
-                  players: room.players.map(player => ({ id: player.playerId, score: player.score }))
+                  updatedTeamScore: room.teamScore,
                 }
               }));
             });
           }
         } else {
-          // 次のターンに進める
           room.currentPlayerIndex++;
           room.currentPlayerId = room.players[room.currentPlayerIndex].playerId;
           
@@ -228,6 +233,31 @@ wss.on('connection', ws => {
             }));
           });
         }
+      }
+      
+      else if (data.type === 'selectGameMode') {
+        const { roomId, playerId, mode } = data.payload;
+        const room = gameRooms.get(roomId);
+
+        if (!room || room.status !== 'waiting' || room.hostId !== playerId) {
+            console.log(`Unauthorized selectGameMode request from player ${playerId} in room ${roomId}.`);
+            return;
+        }
+
+        room.playerChoices[playerId] = mode;
+        
+        room.players.forEach(p => {
+          p.ws.send(JSON.stringify({ 
+            type: 'roomUpdate',
+            payload: { 
+              roomId: room.roomId,
+              players: room.players.map(player => ({ id: player.playerId, playerOrder: player.playerOrder })),
+              playerChoices: room.playerChoices,
+              hostId: room.hostId,
+              teamScore: room.teamScore,
+            }
+          }));
+        });
       }
     } catch (error) {
       console.error(error);
