@@ -62,7 +62,6 @@ const GamePage: React.FC = () => {
 
   return (
     <div className="game-selection-container">
-      {/* ... (JSX部分は変更なし) ... */}
       <header className="page-header">
         <div className="room-id-display">
           <span>ルームID: {roomState.roomId}</span>
@@ -71,27 +70,37 @@ const GamePage: React.FC = () => {
       </header>
       <main className="main-content">
         <section className="game-mode-section">
-          <h2>ゲームモードを選択</h2>
           <div className="mode-options">
-            {/* チュートリアル */}
+            {/* Tutorial Button */}
             <button onClick={() => handleSelectMode('tutorial')} className={`mode-option ${roomState.playerChoices?.[myPlayerId] === 'tutorial' ? 'my-choice' : ''}`}>
               チュートリアル
               <div className="voters">
-                {getPlayersForMode('tutorial').map(p => <span key={p.id} className="selector-icon">{p.playerOrder}P</span>)}
+                {/* Display only players who chose Tutorial */}
+                {getPlayersForMode('tutorial').map(p => (
+                  <span key={p.id} className="selector-icon">{p.playerOrder}P</span>
+                ))}
               </div>
             </button>
-            {/* タイムアタック */}
+
+            {/* Time Attack Button */}
             <button onClick={() => handleSelectMode('timeAttack')} className={`mode-option ${roomState.playerChoices?.[myPlayerId] === 'timeAttack' ? 'my-choice' : ''}`}>
               タイムアタック
               <div className="voters">
-                {getPlayersForMode('timeAttack').map(p => <span key={p.id} className="selector-icon">{p.playerOrder}P</span>)}
+                {/* Display only players who chose Time Attack */}
+                {getPlayersForMode('timeAttack').map(p => (
+                  <span key={p.id} className="selector-icon">{p.playerOrder}P</span>
+                ))}
               </div>
             </button>
-            {/* 回路予測 */}
+
+            {/* Circuit Prediction Button */}
             <button onClick={() => handleSelectMode('circuitPrediction')} className={`mode-option ${roomState.playerChoices?.[myPlayerId] === 'circuitPrediction' ? 'my-choice' : ''}`}>
               回路予測
               <div className="voters">
-                {getPlayersForMode('circuitPrediction').map(p => <span key={p.id} className="selector-icon">{p.playerOrder}P</span>)}
+                {/* Display only players who chose Circuit Prediction */}
+                {getPlayersForMode('circuitPrediction').map(p => (
+                  <span key={p.id} className="selector-icon">{p.playerOrder}P</span>
+                ))}
               </div>
             </button>
           </div>
