@@ -8,7 +8,7 @@ interface PopUpProps {
 
 // 説明コンテンツ
 const notePages: string[] = [
-  "これは1ページ目の説明です。",
+  "推奨環境：Google Chrome",
   "これは2ページ目の説明です。",
   "これは3ページ目の説明です。"
 ];
