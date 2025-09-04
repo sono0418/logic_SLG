@@ -7,6 +7,7 @@ import type { RoomState, GameState } from '../types'; // 型定義ファイル�
 const WEBSOCKET_URL = 'wss://logic-slg.onrender.com'; 
 
 export const useGameWebSocket = (roomId: string, playerId: string) => {
+  const navigate = useNavigate(); 
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [gameState, setGameState] = useState<GameState>({
     currentQuestion: null,
@@ -17,7 +18,6 @@ export const useGameWebSocket = (roomId: string, playerId: string) => {
   });
 
   const webSocketRef = useRef<WebSocket | null>(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const ws = new WebSocket(WEBSOCKET_URL);
@@ -79,6 +79,14 @@ export const useGameWebSocket = (roomId: string, playerId: string) => {
             teamScore: message.payload.finalTeamScore, // 最終スコアをセット
             isGameFinished: true,
           }));
+          break;
+
+        // サーバーから「ゲーム開始！」の号令が来た！
+        case 'gameStart':
+          const mode = message.payload.mode;
+          
+          //ここで全員が一斉に画面遷移する
+          navigate(`/play/${mode}/${roomId}`); 
           break;
       }
     };

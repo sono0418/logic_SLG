@@ -37,7 +37,6 @@ const GamePage: React.FC = () => {
     const selectedMode = roomState?.playerChoices?.[myPlayerId];
     if (selectedMode) {
       sendMessage('requestStartGame', { roomId, playerId: myPlayerId, mode: selectedMode });
-      navigate(`/play/${selectedMode}/${roomId}`);
     }
   };
 
