@@ -1,44 +1,64 @@
 // src/components/GamePage.tsx
-
-import React from 'react';
+import React, { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useGameWebSocket } from '../hooks/useGameWebSocket';
+import PopUpB from './Popups/PopUpB';
+import PopUpC from './Popups/PopUpC';
 // import './GamePage.css';
 
 const GamePage: React.FC = () => {
-  const roomId = 'ROOM1234';
+  const { roomId } = useParams<{ roomId: string }>();
   const myPlayerId = 'player-1'; 
   const maxPlayers = 4;
-
-  const { roomState, sendMessage } = useGameWebSocket(roomId, myPlayerId);
+  const { roomState, sendMessage } = useGameWebSocket(roomId!, myPlayerId);
+  //ポップアップ用の
+  const navigate = useNavigate(); //navigate関数を取得
+  const [isNotePopupOpen, setNotePopupOpen] = useState(false);
+  const [isRankingPopupOpen, setRankingPopupOpen] = useState(false);
 
   // ... (handle functions are the same) ...
   const handleSelectMode = (mode: 'tutorial' | 'timeAttack' | 'circuitPrediction') => {
     sendMessage('selectGameMode', { roomId, playerId: myPlayerId, mode });
   };
+
+  const handleExitRoom = () => {
+    sendMessage('exitRoom', { roomId: roomId!, playerId: myPlayerId });
+    // トップページに遷移
+    navigate('/');
+  };
+
   const handleStartGame = () => {
     const selectedMode = roomState?.playerChoices?.[myPlayerId];
     if (selectedMode) {
       sendMessage('requestStartGame', { roomId, playerId: myPlayerId, mode: selectedMode });
+      navigate(`/play/${selectedMode}/${roomId}`);
     }
   };
-  const handleExitRoom = () => alert('退出機能');
-  const handleCopyRoomId = () => navigator.clipboard.writeText(roomId).then(() => alert('ルームIDをコピーしました！'));
+
+  const handleCopyRoomId = () => {
+    if (roomId){
+    navigator.clipboard.writeText(roomId).then(() => {
+      alert('ルームIDをコピーしました！');
+    });
+    }
+  } ;
 
   if (!roomState) {
     return <div>ルーム情報を読み込み中...</div>;
   }
   
   const isHost = roomState.hostId === myPlayerId;
-  // ✨ 修正点 1: playerChoicesが存在するかチェックしてからアクセスする
+  // 修正点 1: playerChoicesが存在するかチェックしてからアクセスする
   const canStartGame = isHost && !!(roomState.playerChoices && roomState.playerChoices[myPlayerId]);
 
-  // ✨ 修正点 2: playerChoicesが存在しない場合を考慮する
+  // 修正点 2: playerChoicesが存在しない場合を考慮する
   const getPlayersForMode = (mode: string) => {
     if (!roomState.playerChoices) {
       return []; // playerChoicesがなければ空の配列を返す
     }
     return roomState.players.filter(p => roomState.playerChoices[p.id] === mode);
   };
+
 
   return (
     <div className="game-selection-container">
@@ -78,8 +98,8 @@ const GamePage: React.FC = () => {
         </section>
         <div className="actions-bar">
           <div className="utility-buttons">
-            <button>ノート</button>
-            <button>ランキング</button>
+            <button onClick={() => setNotePopupOpen(true)}>ノート</button>
+            <button onClick={() => setRankingPopupOpen(true)}>ランキング</button>
             <button onClick={handleExitRoom}>部屋から退出</button>
           </div>
           <div className="start-section">
@@ -89,6 +109,8 @@ const GamePage: React.FC = () => {
             {!isHost && <p className="host-notice">ゲームの開始は1Pのみ行えます</p>}
           </div>
         </div>
+        {isNotePopupOpen && <PopUpB onClose={() => setNotePopupOpen(false)} />}
+        {isRankingPopupOpen && <PopUpC onClose={() => setRankingPopupOpen(false)} />}
       </main>
       <footer className="page-footer">
         <section className="player-status-section">
