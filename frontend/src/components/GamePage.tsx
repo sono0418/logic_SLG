@@ -44,7 +44,6 @@ const GamePage: React.FC = () => {
     <div className="game-selection-container">
       {/* ... (JSX部分は変更なし) ... */}
       <header className="page-header">
-        <h1>ゲーム選択</h1>
         <div className="room-id-display">
           <span>ルームID: {roomState.roomId}</span>
           <button onClick={handleCopyRoomId}>コピー</button>
