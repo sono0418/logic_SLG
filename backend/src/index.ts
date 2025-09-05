@@ -50,8 +50,17 @@ app.get('*', (req, res) => {
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
+// wsインスタンスにプロパティを追加するための型拡張
+interface WebSocketWithIdentity extends WebSocket {
+  roomId?: string;
+  playerId?: string;
+}
+
 wss.on('connection', ws => {
   console.log('Client connected.');
+
+  // wsインスタンスにプロパティを追加
+  const wsWithId = ws as WebSocketWithIdentity;
 
   ws.on('message', message => {
     try {
@@ -82,6 +91,10 @@ wss.on('connection', ws => {
         
         const playerOrder = room.players.length + 1;
         room.players.push({ playerId, ws, playerOrder });
+
+        // WebSocketインスタンスにroomIdとplayerIdを紐付ける
+        wsWithId.roomId = roomId;
+        wsWithId.playerId = playerId;
         
         console.log(`Player ${playerId} joined room ${roomId}`);
         ws.send(JSON.stringify({ type: 'joinSuccess', payload: { roomId, playerId } }));
@@ -264,8 +277,54 @@ wss.on('connection', ws => {
     }
   });
 
+  // ここに close ハンドラを追加
   ws.on('close', () => {
     console.log('Client disconnected.');
+
+    const wsWithId = ws as WebSocketWithIdentity;
+    const roomId = wsWithId.roomId;
+    const playerId = wsWithId.playerId;
+
+    if (roomId && playerId) {
+      const room = gameRooms.get(roomId);
+      if (room) {
+        const originalPlayerCount = room.players.length;
+        room.players = room.players.filter(p => p.playerId !== playerId);
+        const newPlayerCount = room.players.length;
+
+        console.log(`Player ${playerId} left room ${roomId}. Remaining players: ${newPlayerCount}`);
+
+        if (newPlayerCount === 0) {
+          gameRooms.delete(roomId);
+          console.log(`Room ${roomId} has been deleted due to no players.`);
+          return;
+        }
+
+        room.players.forEach((p, index) => {
+          p.playerOrder = index + 1;
+        });
+
+        if (originalPlayerCount > newPlayerCount && room.hostId === playerId) {
+          room.hostId = room.players[0].playerId;
+          console.log(`Host of room ${roomId} changed to ${room.hostId}.`);
+        }
+
+        room.players.forEach(p => {
+          if (p.ws.readyState === WebSocket.OPEN) {
+            p.ws.send(JSON.stringify({
+              type: 'roomUpdate',
+              payload: {
+                roomId: room.roomId,
+                players: room.players.map(player => ({ id: player.playerId, playerOrder: player.playerOrder })),
+                playerChoices: room.playerChoices,
+                hostId: room.hostId,
+                teamScore: room.teamScore,
+              }
+            }));
+          }
+        });
+      }
+    }
   });
 });
 
