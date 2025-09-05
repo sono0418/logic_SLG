@@ -6,7 +6,6 @@ import apiRouter from './routes/api';
 import { setupWebSocketServer } from './realtime';
 import WebSocket from "ws";
 
-// チュートリアル用の問題配列を定義
 const tutorialCircuits = [
   { circuit: ['AND', 'NOT'], expectedOutput: false, isTutorial: true },
   { circuit: ['OR', 'AND'], expectedOutput: true, isTutorial: true },
@@ -41,16 +40,12 @@ function generateRoomId(): string {
   return Math.floor(Math.random() * (max - min + 1) + min).toString();
 }
 
-
-// ここから消さないで！！！！//////////////////
 app.use(express.json());
 const staticPath = path.join(__dirname, '..', 'dist');
 app.use(express.static(staticPath));
-
 app.get('*', (req, res) => {
   res.sendFile(path.join(staticPath, 'index.html'));
 });
-//ここまで///////////////////////////////////
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
@@ -299,6 +294,3 @@ function generateNewQuestion() {
 server.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
-
-
-
