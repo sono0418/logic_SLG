@@ -88,21 +88,21 @@ wss.on('connection', ws => {
           room = newRoom;
           console.log(`New room ${roomId} created with status: ${room.status}`);
         }
-        
+
         const playerOrder = room.players.length + 1;
         room.players.push({ playerId, ws, playerOrder });
 
         // WebSocketインスタンスにroomIdとplayerIdを紐付ける
         wsWithId.roomId = roomId;
         wsWithId.playerId = playerId;
-        
+
         console.log(`Player ${playerId} joined room ${roomId}`);
         ws.send(JSON.stringify({ type: 'joinSuccess', payload: { roomId, playerId } }));
         room.players.forEach(p => {
           p.ws.send(JSON.stringify({ type: 'roomUpdate', payload: room }));
         });
       }
-      
+
       else if (data.type === 'startGame') {
         const { roomId, playerId, mode } = data.payload;
         const room = gameRooms.get(roomId);
@@ -124,10 +124,10 @@ wss.on('connection', ws => {
         room.playerInputs = new Array(room.players.length).fill(null);
 
         room.players.forEach(p => {
-          p.ws.send(JSON.stringify({ 
-            type: 'gameStart', 
-            payload: { 
-              currentQuestion: room.currentQuestion, 
+          p.ws.send(JSON.stringify({
+            type: 'gameStart',
+            payload: {
+              currentQuestion: room.currentQuestion,
               currentPlayerIndex: room.currentPlayerIndex,
               currentPlayerId: room.currentPlayerId,
               players: room.players.map(p => ({ id: p.playerId, playerOrder: p.playerOrder })),
@@ -138,7 +138,7 @@ wss.on('connection', ws => {
         });
         console.log(`Game started in room ${roomId}. Status: ${room.status}`);
       }
-      
+
       else if (data.type === 'playerInput') {
         const { roomId, playerId, inputValue } = data.payload;
         const room = gameRooms.get(roomId);
@@ -166,7 +166,7 @@ wss.on('connection', ws => {
           if (isCorrect) {
             room.teamScore += 10;
           }
-          
+
           room.roundCount++;
 
           if (room.currentQuestion.isTutorial) {

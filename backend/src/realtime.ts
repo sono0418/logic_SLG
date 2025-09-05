@@ -1,95 +1,272 @@
-// /logic_SLG/backend/src/realtime.ts
+// src/realtime.ts
 
-import WebSocket, { WebSocketServer } from 'ws';
+import { WebSocketServer, WebSocket } from "ws";
+import { handleTutorialLogic, tutorialCircuits } from './tutorial';
 
-// ゲームの状態を管理するインターフェース
-interface GameState {
+// GameStateインターフェースとgameRoomsマップをここに定義
+export interface GameState {
   roomId: string;
-  players: { playerId: string, ws: WebSocket, score: number }[];
+  players: { playerId: string, ws: WebSocket, playerOrder: number }[];
+  currentPlayerId: string | null;
+  roundCount: number;
+  teamScore: number;
   currentQuestion: {
-    circuit: string[]; // 論理回路の構成 (例: ['AND', 'OR', 'NOT'])
-    expectedOutput: boolean; // 最終的な正解
+    circuit: string[];
+    expectedOutput: boolean;
+    isTutorial?: boolean;
   };
-  currentPlayerIndex: number; // 現在のプレイヤーのインデックス
-  playerInputs: (boolean | null)[]; // プレイヤーの入力履歴
+  currentPlayerIndex: number;
+  playerInputs: (boolean | null)[];
+  status: 'waiting' | 'inProgress' | 'ended';
+  playerChoices: { [playerId: string]: string };
+  hostId: string | null;
+}
+export const gameRooms = new Map<string, GameState>();
+
+// generateNewQuestion関数もここに移動
+function generateNewQuestion() {
+  const gateTypes = ['AND', 'OR', 'NOT'];
+  const circuitLength = Math.floor(Math.random() * 2) + 2;
+  const circuit = [];
+  for (let i = 0; i < circuitLength; i++) {
+    circuit.push(gateTypes[Math.floor(Math.random() * gateTypes.length)]);
+  }
+  const initialInput = Math.random() < 0.5;
+  let expectedOutput = initialInput;
+  for (let i = 0; i < circuit.length; i++) {
+    const gateType = circuit[i];
+    if (gateType === 'AND') {
+      expectedOutput = expectedOutput && (Math.random() < 0.5);
+    } else if (gateType === 'OR') {
+      expectedOutput = expectedOutput || (Math.random() < 0.5);
+    } else if (gateType === 'NOT') {
+      expectedOutput = !expectedOutput;
+    }
+  }
+  return { circuit, expectedOutput };
 }
 
-// 複数のゲームルームを管理するマップ
-const gameRooms = new Map<string, GameState>();
-
-/**
- * WebSocketサーバーを初期化し、イベントハンドラーを設定する関数
- * @param wss WebSocketサーバーのインスタンス
- */
-export const setupWebSocketServer = (wss: WebSocketServer) => {
+export function setupWebSocketServer(wss: WebSocketServer) {
   wss.on('connection', ws => {
-    console.log('クライアントが接続しました。');
-    ws.send(JSON.stringify({ type: 'welcome', payload: 'Welcome to the game!' }));
+    interface WebSocketWithIdentity extends WebSocket {
+      roomId?: string;
+      playerId?: string;
+    }
+    const wsWithId = ws as WebSocketWithIdentity;
 
-    ws.on('message', (message: WebSocket.RawData) => {
+    ws.on('message', message => {
       try {
         const data = JSON.parse(message.toString());
 
-        // ルーム参加を処理
         if (data.type === 'joinRoom') {
           const { roomId, playerId } = data.payload;
           let room = gameRooms.get(roomId);
 
           if (!room) {
-            // ルームが存在しない場合、新しいルームを作成
             const newRoom: GameState = {
-              roomId: roomId,
+              roomId,
               players: [],
-              currentQuestion: {
-                circuit: [],
-                expectedOutput: false
-              },
+              currentQuestion: { circuit: [], expectedOutput: false },
               currentPlayerIndex: 0,
-              playerInputs: []
+              playerInputs: [],
+              status: 'waiting',
+              currentPlayerId: null,
+              roundCount: 0,
+              teamScore: 0,
+              playerChoices: {},
+              hostId: playerId,
             };
             gameRooms.set(roomId, newRoom);
             room = newRoom;
+            console.log(`New room ${roomId} created with status: ${room.status}`);
+          }
+          
+          const playerOrder = room.players.length + 1;
+          room.players.push({ playerId, ws, playerOrder });
+          
+          console.log(`Player ${playerId} joined room ${roomId}`);
+          ws.send(JSON.stringify({ type: 'joinSuccess', payload: { roomId, playerId } }));
+          room.players.forEach(p => {
+            p.ws.send(JSON.stringify({ type: 'roomUpdate', payload: room }));
+          });
+        }
+        
+        else if (data.type === 'startGame') {
+          const { roomId, playerId, mode } = data.payload;
+          const room = gameRooms.get(roomId);
+
+          if (!room || room.players[0].playerId !== playerId || room.players.length < 2 || room.status === 'inProgress') {
+            return;
           }
 
-          // プレイヤーをルームに追加
-          room.players.push({ playerId, ws, score: 0 });
-          console.log(`Player ${playerId} joined room ${roomId}`);
+          room.status = 'inProgress';
+          room.roundCount = 0;
+          room.currentPlayerIndex = 0;
+          room.currentPlayerId = room.players[0].playerId;
 
-          // プレイヤーに参加成功を通知
-          ws.send(JSON.stringify({ type: 'joinSuccess', payload: { roomId, playerId } }));
+          if (mode === 'tutorial') {
+            room.currentQuestion = tutorialCircuits[0];
+          } else {
+            room.currentQuestion = generateNewQuestion();
+          }
+          room.playerInputs = new Array(room.players.length).fill(null);
 
-          // ルームの全プレイヤーに更新情報をブロードキャスト
           room.players.forEach(p => {
-            if (p.ws.readyState === WebSocket.OPEN) {
-              p.ws.send(JSON.stringify({ type: 'roomUpdate', payload: room }));
-            }
+            p.ws.send(JSON.stringify({ 
+              type: 'gameStart', 
+              payload: { 
+                currentQuestion: room.currentQuestion, 
+                currentPlayerIndex: room.currentPlayerIndex,
+                currentPlayerId: room.currentPlayerId,
+                players: room.players.map(p => ({ id: p.playerId, playerOrder: p.playerOrder })),
+                teamScore: room.teamScore,
+                mode: mode,
+              }
+            }));
           });
-
-        // プレイヤーの入力を処理
-        } else if (data.type === 'playerInput') {
+          console.log(`Game started in room ${roomId}. Status: ${room.status}`);
+        }
+        
+        else if (data.type === 'playerInput') {
           const { roomId, playerId, inputValue } = data.payload;
           const room = gameRooms.get(roomId);
 
-          if (!room) return;
+          if (!room || room.status !== 'inProgress' || room.currentPlayerId !== playerId) {
+            return;
+          }
 
-          // ... (元のコードの論理回路の計算とターンの進行ロジック) ...
+          room.playerInputs[room.currentPlayerIndex] = inputValue;
 
-          // ターンを進める
-          room.currentPlayerIndex++;
-          // ... (次のプレイヤーへのメッセージ送信またはゲーム終了判定ロジック) ...
+          if (room.currentPlayerIndex === room.players.length - 1) {
+            let currentOutput = room.playerInputs[0] as boolean;
+            for (let i = 1; i < room.playerInputs.length; i++) {
+              const gateType = room.currentQuestion.circuit[i - 1];
+              const nextInput = room.playerInputs[i] as boolean;
+              if (gateType === 'AND') {
+                currentOutput = currentOutput && nextInput;
+              } else if (gateType === 'OR') {
+                currentOutput = currentOutput || nextInput;
+              } else if (gateType === 'NOT') {
+                currentOutput = !currentOutput;
+              }
+            }
+            const isCorrect = currentOutput === room.currentQuestion.expectedOutput;
+            if (isCorrect) {
+              room.teamScore += 10;
+            }
+            
+            room.roundCount++;
+
+            if (room.currentQuestion.isTutorial) {
+              if (room.roundCount < tutorialCircuits.length) {
+                room.currentQuestion = tutorialCircuits[room.roundCount];
+                room.currentPlayerIndex = 0;
+                room.currentPlayerId = room.players[0].playerId;
+                room.playerInputs = new Array(room.players.length).fill(null);
+
+                room.players.forEach(p => {
+                  p.ws.send(JSON.stringify({
+                    type: 'nextRound',
+                    payload: {
+                      roundCount: room.roundCount,
+                      currentQuestion: room.currentQuestion,
+                      updatedTeamScore: room.teamScore,
+                    }
+                  }));
+                });
+              } else {
+                room.status = 'ended';
+                room.players.forEach(p => {
+                  p.ws.send(JSON.stringify({
+                    type: 'gameEnd',
+                    payload: { message: 'Tutorial complete!', finalTeamScore: room.teamScore }
+                  }));
+                });
+                gameRooms.delete(roomId);
+              }
+            } else {
+              if (room.roundCount >= 3) {
+                room.status = 'ended';
+                room.players.forEach(p => {
+                  p.ws.send(JSON.stringify({
+                    type: 'gameEnd',
+                    payload: {
+                      isCorrect,
+                      finalOutput: currentOutput,
+                      expectedOutput: room.currentQuestion.expectedOutput,
+                      finalTeamScore: room.teamScore,
+                    }
+                  }));
+                });
+                gameRooms.delete(roomId);
+              } else {
+                const newQuestion = generateNewQuestion();
+                room.currentQuestion = newQuestion;
+                room.currentPlayerIndex = 0;
+                room.currentPlayerId = room.players[0].playerId;
+                room.playerInputs = new Array(room.players.length).fill(null);
+    
+                room.players.forEach(p => {
+                  p.ws.send(JSON.stringify({
+                    type: 'nextRound',
+                    payload: {
+                      roundCount: room.roundCount,
+                      currentQuestion: room.currentQuestion,
+                      updatedTeamScore: room.teamScore,
+                    }
+                  }));
+                });
+              }
+            }
+
+          } else {
+            room.currentPlayerIndex++;
+            room.currentPlayerId = room.players[room.currentPlayerIndex].playerId;
+
+            room.players.forEach(p => {
+              p.ws.send(JSON.stringify({
+                type: 'turnUpdate',
+                payload: {
+                  currentPlayerId: room.currentPlayerId,
+                  lastInput: inputValue,
+                  circuitGateType: room.currentQuestion.circuit[room.currentPlayerIndex - 1]
+                }
+              }));
+            });
+          }
+        }
+        
+        else if (data.type === 'selectGameMode') {
+          const { roomId, playerId, mode } = data.payload;
+          const room = gameRooms.get(roomId);
+
+          if (!room || room.status !== 'waiting' || room.hostId !== playerId) {
+              console.log(`Unauthorized selectGameMode request from player ${playerId} in room ${roomId}.`);
+              return;
+          }
+
+          room.playerChoices[playerId] = mode;
+          
+          room.players.forEach(p => {
+            p.ws.send(JSON.stringify({ 
+              type: 'roomUpdate',
+              payload: { 
+                roomId: room.roomId,
+                players: room.players.map(player => ({ id: player.playerId, playerOrder: player.playerOrder })),
+                playerChoices: room.playerChoices,
+                hostId: room.hostId,
+                teamScore: room.teamScore,
+              }
+            }));
+          });
         }
       } catch (error) {
-        console.error('メッセージのパースまたは処理中にエラーが発生しました:', error);
+        console.error(error);
       }
     });
 
     ws.on('close', () => {
-      console.log('クライアントが切断しました。');
-      // プレイヤーが退室した際の処理（例：ゲームルームからプレイヤーを削除）
-    });
-
-    ws.on('error', error => {
-      console.error('WebSocketエラー:', error);
+      console.log('Client disconnected.');
     });
   });
-};
+}
