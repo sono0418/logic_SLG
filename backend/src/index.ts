@@ -13,7 +13,6 @@ const tutorialCircuits = [
   { circuit: ['OR', 'NOT', 'AND'], expectedOutput: false, isTutorial: true }
 ];
 
-// ゲームの状態を管理するインターフェースを定義
 interface GameState {
   roomId: string;
   players: { playerId: string, ws: WebSocket, playerOrder: number }[];
@@ -23,7 +22,7 @@ interface GameState {
   currentQuestion: {
     circuit: string[];
     expectedOutput: boolean;
-    isTutorial?: boolean; // isTutorialプロパティを追加
+    isTutorial?: boolean;
   };
   currentPlayerIndex: number;
   playerInputs: (boolean | null)[];
@@ -41,6 +40,7 @@ function generateRoomId(): string {
   const max = 99999;
   return Math.floor(Math.random() * (max - min + 1) + min).toString();
 }
+
 
 // ここから消さないで！！！！//////////////////
 app.use(express.json());
@@ -299,3 +299,6 @@ function generateNewQuestion() {
 server.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
+
+
+
