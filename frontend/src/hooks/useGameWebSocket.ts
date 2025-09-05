@@ -13,8 +13,9 @@ export const useGameWebSocket = (roomId: string, playerId: string) => {
     currentQuestion: null,
     currentPlayerId: null,
     players: [],
-    teamScore: 0, //teamScore を初期化
+    teamScore: 0,
     isGameFinished: false,
+    roundCount: 0, // ✨ この行を追加
   });
 
   const webSocketRef = useRef<WebSocket | null>(null);
@@ -41,18 +42,27 @@ export const useGameWebSocket = (roomId: string, playerId: string) => {
           setRoomState(message.payload);
           break;
 
-        // ✨ チームスコア形式に対応
-        case 'gameStart':
-          setGameState(prev => ({
-            ...prev,
+        case 'gameStart': { 
+          console.log('Received gameStart signal. Saving state and navigating...');
+          
+          // 1. payloadから `mode` を一度だけ取り出す
+          const mode = message.payload.mode;
+
+          // 2. サーバーから送られてきたゲームの初期状態を保存する
+          setGameState(prevState => ({
+            ...prevState,
             currentQuestion: message.payload.currentQuestion,
             currentPlayerId: message.payload.currentPlayerId,
             players: message.payload.players,
-            teamScore: message.payload.teamScore, // teamScore をセット
+            teamScore: message.payload.teamScore,
+            roundCount: 0,
             isGameFinished: false,
           }));
-          navigate(`/game/${roomId}`);
+
+          // 3. 準備した `mode` を使って、全員で画面遷移する
+          navigate(`/play/${mode}/${roomId}`); 
           break;
+        }
 
         case 'turnUpdate':
           setGameState(prev => ({
@@ -63,7 +73,6 @@ export const useGameWebSocket = (roomId: string, playerId: string) => {
           }));
           break;
         
-        // ✨ チームスコア形式に対応
         case 'roundResult':
           setGameState(prev => ({
             ...prev,
@@ -79,14 +88,6 @@ export const useGameWebSocket = (roomId: string, playerId: string) => {
             teamScore: message.payload.finalTeamScore, // 最終スコアをセット
             isGameFinished: true,
           }));
-          break;
-
-        // サーバーから「ゲーム開始！」の号令が来た！
-        case 'gameStart':
-          const mode = message.payload.mode;
-          
-          //ここで全員が一斉に画面遷移する
-          navigate(`/play/${mode}/${roomId}`); 
           break;
       }
     };

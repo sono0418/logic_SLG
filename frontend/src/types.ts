@@ -27,6 +27,7 @@ export interface GameState {
   currentPlayerId: string | null;
   players: Player[];         // プレイヤーリスト（スコアは持たない）
   teamScore: number;         // チームのスコア
+  roundCount: number; 
   lastInput?: boolean;      // 直前のプレイヤーの入力
   roundResult?: {           // ラウンド結果
     isCorrect: boolean;
