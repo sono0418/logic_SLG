@@ -96,7 +96,7 @@ wss.on('connection', ws => {
       }
       
       else if (data.type === 'startGame') {
-        const { roomId, playerId, mode } = data.payload; // modeプロパティを追加
+        const { roomId, playerId, mode } = data.payload;
         const room = gameRooms.get(roomId);
 
         if (!room || room.players[0].playerId !== playerId || room.players.length < 2 || room.status === 'inProgress') {
@@ -108,7 +108,6 @@ wss.on('connection', ws => {
         room.currentPlayerIndex = 0;
         room.currentPlayerId = room.players[0].playerId;
 
-        // ここでモードに応じて問題を初期化
         if (mode === 'tutorial') {
           room.currentQuestion = tutorialCircuits[0];
         } else {
@@ -162,10 +161,8 @@ wss.on('connection', ws => {
           
           room.roundCount++;
 
-          // チュートリアルモードの場合
           if (room.currentQuestion.isTutorial) {
             if (room.roundCount < tutorialCircuits.length) {
-              // 次のチュートリアル問題を出題
               room.currentQuestion = tutorialCircuits[room.roundCount];
               room.currentPlayerIndex = 0;
               room.currentPlayerId = room.players[0].playerId;
@@ -182,7 +179,6 @@ wss.on('connection', ws => {
                 }));
               });
             } else {
-              // チュートリアル終了
               room.status = 'ended';
               room.players.forEach(p => {
                 p.ws.send(JSON.stringify({
@@ -193,7 +189,6 @@ wss.on('connection', ws => {
               gameRooms.delete(roomId);
             }
           } else {
-            // 通常モードの場合
             if (room.roundCount >= 3) {
               room.status = 'ended';
               room.players.forEach(p => {
