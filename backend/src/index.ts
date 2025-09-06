@@ -168,6 +168,7 @@ wss.on('connection', ws => {
           p.ws.send(JSON.stringify({ 
             type: 'gameStart', 
             payload: { 
+              roomId: room.roomId,
               currentQuestion: room.currentQuestion, 
               currentPlayerIndex: room.currentPlayerIndex,
               currentPlayerId: room.currentPlayerId,
