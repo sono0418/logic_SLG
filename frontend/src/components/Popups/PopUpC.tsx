@@ -13,7 +13,9 @@ interface PlayerScore {
 }
 
 // バックエンドのURLを環境変数から取得
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3000/api/ranking";
+// ローカル環境では`http://localhost:3000/api/ranking`が使われる
+// Renderのような本番環境では、設定された環境変数の値が使われる
+const API_URL = "https://logic-slg.onrender.com/api/ranking";
 
 const PopUpC: React.FC<PopUpProps> = ({ onClose }) => {
   const [scores, setScores] = useState<PlayerScore[]>([]);
@@ -31,6 +33,7 @@ const PopUpC: React.FC<PopUpProps> = ({ onClose }) => {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
+        // 取得したデータをスコアの降順でソート
         const sortedScores = data.sort((a: PlayerScore, b: PlayerScore) => b.score - a.score);
         setScores(sortedScores);
       } catch (error) {
