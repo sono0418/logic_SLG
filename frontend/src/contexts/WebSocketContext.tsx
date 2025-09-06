@@ -45,8 +45,17 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
           case 'gameStart': { 
             const { payload } = message;
             setGameState(prevState => ({ ...prevState, ...payload, isGameFinished: false, roundCount: 0 }));
-            const mode = payload.mode || 'tutorial';
-            navigate(`/play/${mode}/${payload.roomId}`); 
+            
+            // ✨ =================================================================
+            // ✨ 修正点: roomIdが存在するかを必ず確認してから遷移する
+            // ✨ =================================================================
+            if (payload.roomId) {
+              const mode = payload.mode || 'tutorial';
+              navigate(`/play/${mode}/${payload.roomId}`); 
+            } else {
+              // もしroomIdがなければ、エラーをログに出力してクラッシュを防ぐ
+              console.error("Critical Error: gameStart payload is missing roomId. Navigation aborted.");
+            }
             break;
           }
           case 'turnUpdate':
@@ -65,14 +74,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     }
   }, [playerId, navigate]);
 
-  // ✨ useCallbackでsendMessage関数をメモ化する
   const sendMessage = useCallback((type: string, payload: object) => {
     if (webSocket?.readyState === WebSocket.OPEN) {
       webSocket.send(JSON.stringify({ type, payload }));
     }
   }, [webSocket]);
 
-  // ✨ useMemoでContextの値をメモ化する
   const contextValue = useMemo(() => ({
     roomState,
     gameState,
