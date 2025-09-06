@@ -137,7 +137,7 @@ const GamePage: React.FC = () => {
               return (
                 <div key={index} className={`player-slot ${player ? 'active' : 'inactive'}`}>
                   <span className="player-order-label">{index + 1}P</span>
-                  <span className="player-name">{player ? `Player ${player.playerOrder}` : '待機中...'}</span>
+                  <span className="player-name">{player ? ` `: '待機中...'}</span>
                 </div>
               );
             })}
