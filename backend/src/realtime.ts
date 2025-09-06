@@ -12,7 +12,7 @@ export interface GameState {
   teamScore: number;
   currentQuestion: {
     circuit: string[];
-    expectedOutput: boolean;
+    expectedOutput: boolean | { C: boolean; S: boolean; };
     isTutorial?: boolean;
   };
   currentPlayerIndex: number;

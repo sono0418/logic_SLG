@@ -3,9 +3,27 @@ import { WebSocket } from "ws";
 import { GameState } from './realtime'; // realtime.tsからGameStateインターフェースをインポート
 
 export const tutorialCircuits = [
-  { circuit: ['AND', 'NOT'], expectedOutput: false, isTutorial: true },
-  { circuit: ['OR', 'AND'], expectedOutput: true, isTutorial: true },
-  { circuit: ['OR', 'NOT', 'AND'], expectedOutput: false, isTutorial: true }
+  // 問題1: A=false, B=false
+  {
+    circuit: ['AND', 'OR', 'NOT', 'AND'],
+    inputAssignments: { A: false, B: false },
+    expectedOutput: { C: false, S: false },
+    isTutorial: true
+  },
+  // 問題2: A=false, B=true
+  {
+    circuit: ['AND', 'OR', 'NOT', 'AND'],
+    inputAssignments: { A: false, B: true },
+    expectedOutput: { C: false, S: true },
+    isTutorial: true
+  },
+  // 問題3: A=true, B=true
+  {
+    circuit: ['AND', 'OR', 'NOT', 'AND'],
+    inputAssignments: { A: true, B: true },
+    expectedOutput: { C: true, S: false },
+    isTutorial: true
+  }
 ];
 
 /**
