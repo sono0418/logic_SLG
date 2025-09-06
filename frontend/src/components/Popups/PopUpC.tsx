@@ -56,6 +56,9 @@ const PopUpC: React.FC<PopUpProps> = ({ onClose }) => {
         {isLoading ? (
           <p>ランキングを読み込み中...</p>
         ) : (
+          scores.length === 0 ? (
+            <p>ランキングがありません。</p>
+          ) : (
           <ol>
             {scores.map((player, index) => (
               <li key={player.id}>
@@ -63,6 +66,7 @@ const PopUpC: React.FC<PopUpProps> = ({ onClose }) => {
               </li>
             ))}
           </ol>
+          )
         )}
       </div>
     </div>
