@@ -1,0 +1,254 @@
+/* --- 全体のコンテナとレイアウト --- */
+.game-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #E5DECA; /* 背景色 */
+  color: #470000; /* 文字色 */
+  font-family: 'Inter', 'Yu Gothic UI', sans-serif;
+  overflow: hidden; /* はみ出しを隠す */
+}
+
+/* --- ヘッダー --- */
+.game-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background-color: #25282e;
+  border-bottom: 1px solid #3a3f47;
+}
+
+.header-left {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.header-left h1 {
+  font-size: 1.5rem;
+  margin: 0;
+  color: #00ff9b; /* アクセントカラー */
+}
+
+.header-right button {
+  background-color: #3a3f47;
+  color: #e0e0e0;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.header-right button:hover {
+  background-color: #4a4f57;
+}
+
+/* --- ステータスバー（タイマーなど） --- */
+.status-bar {
+  text-align: center;
+  padding: 0.75rem;
+  font-size: 1.2rem;
+  font-weight: 500;
+  background-color: rgba(0, 0, 0, 0.2);
+  min-height: 48px; /* 高さを固定してガタつきを防ぐ */
+}
+
+.status-text.start-text {
+  color: #00ff9b;
+  font-size: 1.5rem;
+  animation: fadeInZoom 0.5s ease-out;
+}
+
+/* --- メインコンテンツとサイドバーのコンテナ --- */
+.content-wrapper {
+  display: flex;
+  flex-grow: 1; /* 残りの高さいっぱいに広がる */
+}
+
+.game-main {
+  flex-grow: 1;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.game-sidebar {
+  width: 250px;
+  padding: 2rem;
+  background-color: #25282e;
+  border-left: 1px solid #3a3f47;
+  text-align: center;
+}
+
+.game-sidebar h3 {
+  color: #00ff9b;
+  margin-bottom: 0.5rem;
+}
+
+.score {
+  font-size: 2.5rem;
+  font-weight: bold;
+  margin: 0;
+  color: #fff;
+}
+
+/* --- 進捗ボックス --- */
+.progress-indicator .boxes {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.progress-indicator .box {
+  width: 50px;
+  height: 20px;
+  background-color: #3a3f47;
+  border-radius: 3px;
+  transition: background-color 0.3s;
+}
+
+.progress-indicator .box.active {
+  background-color: #00ff9b; /* 現在のステップをハイライト */
+}
+
+/* --- ゲート表示と入力 --- */
+.gate-display {
+  text-align: center;
+}
+
+.gate-diagram {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  font-size: 1.2rem;
+  margin: 1rem 0;
+}
+
+.gate-box {
+  background-color: #3a3f47;
+  padding: 1rem 2rem;
+  border-radius: 5px;
+  border: 1px solid #4a4f57;
+  font-weight: bold;
+  font-size: 1.5rem;
+}
+
+.input-controls .buttons {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.input-controls button {
+  font-size: 2rem;
+  font-weight: bold;
+  width: 100px;
+  height: 100px;
+  border: 2px solid #00ff9b;
+  background-color: transparent;
+  color: #00ff9b;
+  border-radius: 50%; /* 丸いボタン */
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.input-controls button:hover:not(:disabled) {
+  background-color: #00ff9b;
+  color: #1a1d21;
+}
+
+.input-controls button:disabled {
+  border-color: #4a4f57;
+  color: #4a4f57;
+  cursor: not-allowed;
+}
+
+.wait-message {
+  margin-top: 1rem;
+  color: #888;
+}
+
+/* --- プレイヤーリスト --- */
+.player-list {
+  list-style: none;
+  padding: 0;
+  margin-top: 2rem;
+}
+
+.player-list li {
+  padding: 0.75rem;
+  background-color: #3a3f47;
+  margin-bottom: 0.5rem;
+  border-radius: 5px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.player-list li.current-turn {
+  background-color: #00ff9b;
+  color: #1a1d21;
+  transform: scale(1.05); /* 現在のターンを少し大きく */
+}
+
+/* --- ゲーム終了画面 --- */
+.game-finished {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5rem;
+}
+.game-finished h1 { color: #00ff9b; }
+.game-finished button {
+  background-color: #00ff9b;
+  color: #1a1d21;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 5px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.game-finished button:hover { transform: scale(1.05); }
+
+/* --- アニメーション --- */
+@keyframes fadeInZoom {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* --- ポップアップの基本スタイル（共通） --- */
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.popup-content {
+  background-color: #25282e;
+  padding: 2rem;
+  border-radius: 8px;
+  border: 1px solid #3a3f47;
+  min-width: 300px;
+  text-align: center;
+}

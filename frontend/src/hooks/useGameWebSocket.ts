@@ -44,7 +44,6 @@ export const useGameWebSocket = (roomId: string, playerId: string) => {
 
         case 'gameStart': { 
           console.log('Received gameStart signal. Saving state and navigating...');
-          
           // 1. payloadから `mode` を一度だけ取り出す
           const mode = message.payload.mode;
 

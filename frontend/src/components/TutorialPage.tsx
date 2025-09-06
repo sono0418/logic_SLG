@@ -4,6 +4,7 @@ import { useGameWebSocket } from '../hooks/useGameWebSocket';
 import { PlayerIdContext } from '../contexts/PlayerIdContext';
 import PopUpB from './Popups/PopUpB';
 import PopUpTR from './Popups/PopUpTR';
+import './TutorialPage.css';
 
 const TutorialPage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();

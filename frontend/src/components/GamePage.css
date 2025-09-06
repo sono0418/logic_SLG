@@ -1,0 +1,217 @@
+/* --- 全体のコンテナとレイアウト --- */
+.game-selection-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #E5DECA; /* ダークな背景色 */
+  color: #470000; /* 基本の文字色 */
+  font-family: 'Inter', 'Yu Gothic UI', sans-serif;
+  overflow: hidden;
+}
+
+/* --- ヘッダー --- */
+.page-header {
+  padding: 1rem 2rem;
+  background-color: #25282e;
+  border-bottom: 1px solid #3a3f47;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.room-id-display {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.room-id-display span {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #aaa;
+}
+
+.room-id-display button {
+  background-color: #3a3f47;
+  color: #e0e0e0;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.room-id-display button:hover {
+  background-color: #4a4f57;
+}
+
+
+/* --- メインコンテンツ --- */
+.main-content {
+  flex-grow: 1; /* 残りの高さいっぱいに広がる */
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* 垂直方向中央揃え */
+  align-items: center; /* 水平方向中央揃え */
+  gap: 3rem;
+  padding: 2rem;
+}
+
+/* --- ゲームモード選択 --- */
+.game-mode-section {
+  text-align: center;
+}
+
+.mode-options {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.mode-option {
+  position: relative;
+  background-color: transparent;
+  border: 2px solid #3a3f47;
+  color: #e0e0e0;
+  padding: 2rem 3rem;
+  border-radius: 8px;
+  font-size: 1.25rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.mode-option:hover {
+  border-color: #00ff9b;
+  color: #00ff9b;
+}
+
+.mode-option.my-choice {
+  border-color: #00ff9b;
+  box-shadow: 0 0 15px rgba(0, 255, 155, 0.3);
+  transform: translateY(-5px);
+}
+
+.voters {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  display: flex;
+  gap: 0.3rem;
+}
+
+.selector-icon {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 24px;
+  height: 24px;
+  background-color: #00ff9b;
+  color: #1a1d21;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  font-weight: bold;
+  border: 2px solid #1a1d21;
+}
+
+/* --- 操作ボタンエリア --- */
+.actions-bar {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+}
+
+.utility-buttons button {
+  background-color: #3a3f47;
+  color: #e0e0e0;
+  border: none;
+  padding: 0.75rem 1.25rem;
+  border-radius: 5px;
+  margin: 0 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.utility-buttons button:hover {
+  background-color: #4a4f57;
+}
+
+.start-section {
+  text-align: center;
+}
+
+.start-button {
+  background-color: #00ff9b;
+  color: #1a1d21;
+  border: none;
+  padding: 1rem 3rem;
+  border-radius: 8px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.start-button:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 0 20px rgba(0, 255, 155, 0.5);
+}
+
+.start-button:disabled {
+  background-color: #3a3f47;
+  color: #666;
+  cursor: not-allowed;
+}
+
+.host-notice {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: #888;
+}
+
+
+/* --- フッター (プレイヤー表示) --- */
+.page-footer {
+  padding: 1rem;
+  background-color: #25282e;
+  border-top: 1px solid #3a3f47;
+}
+
+.player-status-section {
+  width: 100%;
+}
+
+.player-slots {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.player-slot {
+  width: 120px;
+  padding: 1rem;
+  background-color: #3a3f47;
+  border-radius: 8px;
+  text-align: center;
+  border: 2px solid transparent;
+  transition: all 0.3s;
+}
+
+.player-slot.inactive {
+  opacity: 0.4;
+}
+
+.player-slot.active {
+  border-color: #00ff9b;
+}
+
+.player-order-label {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+.player-name {
+  font-size: 0.9rem;
+}

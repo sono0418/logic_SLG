@@ -5,7 +5,7 @@ import { useGameWebSocket } from '../hooks/useGameWebSocket';
 import { PlayerIdContext } from '../contexts/PlayerIdContext'; 
 import PopUpB from './Popups/PopUpB';
 import PopUpC from './Popups/PopUpC';
-// import './GamePage.css';
+import './GamePage.css';
 
 const GamePage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
