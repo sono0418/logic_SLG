@@ -1,4 +1,3 @@
-// src/components/Popups/PopUpC.tsx
 import React, { useState, useEffect } from 'react';
 
 // 親から渡されるPropsの型を定義
@@ -13,7 +12,8 @@ interface PlayerScore {
   score: number;
 }
 
-const API_URL = "バックエンドのURL"; // バックエンドのURL
+// バックエンドのURLを環境変数から取得
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3000/api/ranking";
 
 const PopUpC: React.FC<PopUpProps> = ({ onClose }) => {
   const [scores, setScores] = useState<PlayerScore[]>([]);
@@ -25,18 +25,14 @@ const PopUpC: React.FC<PopUpProps> = ({ onClose }) => {
     const fetchScores = async () => {
       try {
         setIsLoading(true);
-        // 実際にはここにAPI呼び出しのコードを記述します。
-        // 多分API作られてないからAIと相談してAPIつくるかうまいこと呼び出すかしよう
-
-        // 今回はダミーデータを使います
-        const mockData: PlayerScore[] = [
-          { id: 1, name: "Player A", score: 5000 },
-          { id: 2, name: "Player B", score: 4500 },
-          { id: 3, name: "Player C", score: 4800 },
-        ];
-        const sortedScores = mockData.sort((a, b) => b.score - a.score);
+        // バックエンドからデータを取得
+        const response = await fetch(API_URL);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        const sortedScores = data.sort((a: PlayerScore, b: PlayerScore) => b.score - a.score);
         setScores(sortedScores);
-        //ここまでダミー
       } catch (error) {
         console.error("データの取得に失敗しました", error);
       } finally {
@@ -46,10 +42,6 @@ const PopUpC: React.FC<PopUpProps> = ({ onClose }) => {
 
     fetchScores();
   }, []); // 依存配列が空なので、コンポーネントが最初に表示された時（マウント時）に一度だけ実行される
-
-// 例: ranking.ts (APIエンドポイントのファイル)
-
-
 
   return (
     <div className="popup-overlay">
