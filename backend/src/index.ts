@@ -4,12 +4,12 @@ import http from 'http';
 import { WebSocketServer } from 'ws';
 import WebSocket from "ws";
 
-// (ここからGameStateなどの定義は変更なし)
 const tutorialCircuits = [
   { circuit: ['AND', 'NOT'], expectedOutput: false, isTutorial: true },
   { circuit: ['OR', 'AND'], expectedOutput: true, isTutorial: true },
   { circuit: ['OR', 'NOT', 'AND'], expectedOutput: false, isTutorial: true }
 ];
+
 interface GameState {
   roomId: string;
   players: { playerId: string, ws: WebSocket, playerOrder: number }[];
@@ -27,6 +27,7 @@ interface GameState {
   playerChoices: { [playerId: string]: string };
   hostId: string | null;
 }
+
 const gameRooms = new Map<string, GameState>();
 const disconnectionTimers = new Map<string, NodeJS.Timeout>();
 
@@ -39,7 +40,6 @@ function generateRoomId(): string {
   return Math.floor(Math.random() * (max - min + 1) + min).toString();
 }
 
-// (静的ファイル配信部分は変更なし)
 app.use(express.json());
 const staticPath = path.join(__dirname, '..', 'dist');
 app.use(express.static(staticPath));
@@ -107,15 +107,36 @@ wss.on('connection', ws => {
         console.log(`Player ${playerId} joined room ${roomId}`);
         ws.send(JSON.stringify({ type: 'joinSuccess', payload: { roomId, playerId } }));
         
-        const roomUpdatePayload = {
+        // ✨ =================================================================
+        // ✨ ここからが修正イメージを適用した部分です
+        // ✨ =================================================================
+        
+        // まず基本のペイロードを作成
+        const roomUpdatePayload: any = {
             roomId: room.roomId,
             players: room.players.map(p => ({ id: p.playerId, playerOrder: p.playerOrder })),
             playerChoices: room.playerChoices,
             hostId: room.hostId,
         };
+
+        // もしゲーム中なら、ゲーム状態の情報をペイロードに追加する
+        if (room.status === 'inProgress') {
+          console.log(`Syncing in-progress game state for room ${roomId}.`);
+          roomUpdatePayload.status = 'inProgress';
+          roomUpdatePayload.currentQuestion = room.currentQuestion;
+          roomUpdatePayload.currentPlayerId = room.currentPlayerId;
+          roomUpdatePayload.teamScore = room.teamScore;
+          roomUpdatePayload.roundCount = room.roundCount;
+          roomUpdatePayload.isGameFinished = false;
+        }
+
+        // 最終的なペイロードを全員に送信
         room.players.forEach(p => {
           p.ws.send(JSON.stringify({ type: 'roomUpdate', payload: roomUpdatePayload }));
         });
+        
+        // ✨ 修正イメージはここまで
+        // ✨ =================================================================
       }
 
       else if (data.type === 'startGame') {
@@ -269,7 +290,6 @@ wss.on('connection', ws => {
         const { roomId, playerId, mode } = data.payload;
         const room = gameRooms.get(roomId);
 
-        // ✨ 修正点: ホスト以外のプレイヤーもモードを選択できるように修正
         if (!room || room.status !== 'waiting') {
             console.log(`selectGameMode denied. Room status: ${room?.status}`);
             return;
@@ -292,7 +312,6 @@ wss.on('connection', ws => {
       console.error(error);
     }
   });
-
 
   ws.on('close', () => {
     console.log('Client disconnected.');

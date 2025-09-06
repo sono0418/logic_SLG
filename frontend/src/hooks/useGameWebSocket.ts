@@ -1,5 +1,4 @@
 // src/hooks/useGameWebSocket.ts
-
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { RoomState, GameState } from '../types'; // 型定義ファイルをインポート
@@ -15,7 +14,7 @@ export const useGameWebSocket = (roomId: string, playerId: string) => {
     players: [],
     teamScore: 0,
     isGameFinished: false,
-    roundCount: 0, // ✨ この行を追加
+    roundCount: 0,
   });
 
   const webSocketRef = useRef<WebSocket | null>(null);
@@ -40,6 +39,19 @@ export const useGameWebSocket = (roomId: string, playerId: string) => {
         //  playerChoices を含む新しい形式に対応
         case 'roomUpdate':
           setRoomState(message.payload);
+          if (message.payload.status === 'inProgress') {
+            console.log('Received game state sync via roomUpdate.');
+            setGameState(prevState => ({
+              ...prevState,
+              currentQuestion: message.payload.currentQuestion,
+              currentPlayerId: message.payload.currentPlayerId,
+              // playersの形式をGameStateに合わせる
+              players: message.payload.players.map((p: any) => ({ id: p.id, playerOrder: p.playerOrder, score: 0 })),
+              teamScore: message.payload.teamScore,
+              roundCount: message.payload.roundCount,
+              isGameFinished: message.payload.isGameFinished || false,
+            }));
+          }
           break;
 
         case 'gameStart': { 
