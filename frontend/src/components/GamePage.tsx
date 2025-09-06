@@ -1,3 +1,4 @@
+// src/components/GamePage.tsx
 import React, { useState, useContext, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import PopUpB from './Popups/PopUpB';
@@ -11,32 +12,22 @@ const GamePage: React.FC = () => {
   const myPlayerId = useContext(PlayerIdContext);
   const navigate = useNavigate();
 
-  // アプリ全体の「通信司令室」(Context)から機能を取得します
   const wsContext = useContext(WebSocketContext);
-  
-  // このページが表示された際、または接続が確立された際に一度だけ入室処理を行います
-  // これにより、無限ループを防ぎます
+
   useEffect(() => {
-    // ContextとroomIdが準備できたら、入室命令を一度だけ出します
     if (wsContext && wsContext.isConnected && roomId) {
       wsContext.joinRoom(roomId);
     }
-    // wsContext.isConnected や roomId が変わらない限り、再実行されません
-  }, [wsContext, wsContext?.isConnected, roomId]); 
+  }, [wsContext, wsContext?.isConnected, roomId]);
 
-  // UI（ポップアップ）の状態を管理するローカルなState
   const [isNotePopupOpen, setNotePopupOpen] = useState(false);
   const [isRankingPopupOpen, setRankingPopupOpen] = useState(false);
 
-  // ContextやIDが準備できるまでは、ローディング画面を表示して待機します
   if (!wsContext || !myPlayerId) {
     return <div>接続中...</div>;
   }
-  
-  // Contextから必要な情報と関数を取り出します
-  const { roomState, sendMessage } = wsContext;
 
-  // --- イベントハンドラ ---
+  const { roomState, sendMessage } = wsContext;
 
   const handleSelectMode = (mode: 'tutorial' | 'timeAttack' | 'circuitPrediction') => {
     if (myPlayerId && roomId) {
@@ -47,7 +38,6 @@ const GamePage: React.FC = () => {
   const handleStartGame = () => {
     const selectedMode = roomState?.playerChoices?.[myPlayerId!];
     if (selectedMode && myPlayerId && roomId) {
-      // サーバーに 'startGame' メッセージを送るだけ。実際の遷移はContextが担当します
       sendMessage('startGame', { roomId, playerId: myPlayerId, mode: selectedMode });
     }
   };
@@ -67,18 +57,15 @@ const GamePage: React.FC = () => {
     }
   };
 
-  // サーバーからルーム情報が届くまでは、ローディング画面を表示します
   if (!roomState) {
     return <div>ルーム情報を読み込み中...</div>;
   }
-  
-  // --- UI表示のためのヘルパー ---
 
   const isHost = roomState.hostId === myPlayerId;
   const canStartGame = isHost && !!(roomState.playerChoices && roomState.playerChoices[myPlayerId]);
 
   const getPlayersForMode = (mode: string) => {
-    if (!roomState.playerChoices) return [];
+    if (!roomState?.playerChoices || !roomState?.players) return [];
     return roomState.players.filter(p => roomState.playerChoices[p.id] === mode);
   };
 
@@ -95,17 +82,38 @@ const GamePage: React.FC = () => {
         <section className="game-mode-section">
           <h2>ゲームモードを選択</h2>
           <div className="mode-options">
-            <button onClick={() => handleSelectMode('tutorial')} className={`mode-option ${roomState.playerChoices?.[myPlayerId] === 'tutorial' ? 'my-choice' : ''}`}>
+            <button
+              onClick={() => handleSelectMode('tutorial')}
+              className={`mode-option ${roomState.playerChoices?.[myPlayerId] === 'tutorial' ? 'my-choice' : ''}`}
+            >
               チュートリアル
-              <div className="voters">{getPlayersForMode('tutorial').map(p => (<span key={p.id} className="selector-icon">{p.playerOrder}P</span>))}</div>
+              <div className="voters">
+                {(getPlayersForMode('tutorial') ?? []).map(p => (
+                  <span key={p.id} className="selector-icon">{p.playerOrder}P</span>
+                ))}
+              </div>
             </button>
-            <button onClick={() => handleSelectMode('timeAttack')} className={`mode-option ${roomState.playerChoices?.[myPlayerId] === 'timeAttack' ? 'my-choice' : ''}`}>
+            <button
+              onClick={() => handleSelectMode('timeAttack')}
+              className={`mode-option ${roomState.playerChoices?.[myPlayerId] === 'timeAttack' ? 'my-choice' : ''}`}
+            >
               タイムアタック
-              <div className="voters">{getPlayersForMode('timeAttack').map(p => (<span key={p.id} className="selector-icon">{p.playerOrder}P</span>))}</div>
+              <div className="voters">
+                {(getPlayersForMode('timeAttack') ?? []).map(p => (
+                  <span key={p.id} className="selector-icon">{p.playerOrder}P</span>
+                ))}
+              </div>
             </button>
-            <button onClick={() => handleSelectMode('circuitPrediction')} className={`mode-option ${roomState.playerChoices?.[myPlayerId] === 'circuitPrediction' ? 'my-choice' : ''}`}>
+            <button
+              onClick={() => handleSelectMode('circuitPrediction')}
+              className={`mode-option ${roomState.playerChoices?.[myPlayerId] === 'circuitPrediction' ? 'my-choice' : ''}`}
+            >
               回路予測
-              <div className="voters">{getPlayersForMode('circuitPrediction').map(p => (<span key={p.id} className="selector-icon">{p.playerOrder}P</span>))}</div>
+              <div className="voters">
+                {(getPlayersForMode('circuitPrediction') ?? []).map(p => (
+                  <span key={p.id} className="selector-icon">{p.playerOrder}P</span>
+                ))}
+              </div>
             </button>
           </div>
         </section>
@@ -127,7 +135,7 @@ const GamePage: React.FC = () => {
         <section className="player-status-section">
           <div className="player-slots">
             {[...Array(4)].map((_, index) => {
-              const player = roomState.players.find(p => p.playerOrder === index + 1);
+              const player = roomState.players?.find(p => p.playerOrder === index + 1);
               return (
                 <div key={index} className={`player-slot ${player ? 'active' : 'inactive'}`}>
                   <span className="player-order-label">{index + 1}P</span>
@@ -143,4 +151,3 @@ const GamePage: React.FC = () => {
 };
 
 export default GamePage;
-
