@@ -11,10 +11,10 @@ const TutorialPage: React.FC = () => {
   const navigate = useNavigate();
   const myPlayerId = useContext(PlayerIdContext);
 
-  // 新しいContextから、アプリ全体のWebSocketの状態と関数を取得
+  // 新しいContextから、アプリ全体のWebSocketの状態と関数を取得します
   const wsContext = useContext(WebSocketContext);
 
-  // このページに直接アクセス(リロード)した際に、再入室するためのuseEffect
+  // このページに直接アクセス(リロード)した際に、再入室するためのuseEffectです
   useEffect(() => {
     if (wsContext && wsContext.isConnected && roomId) {
       wsContext.joinRoom(roomId);
@@ -27,19 +27,21 @@ const TutorialPage: React.FC = () => {
   const [isNotePopupOpen, setNotePopupOpen] = useState(false);
   const [isResultPopupOpen, setResultPopupOpen] = useState(false);
 
-  // ContextやIDが準備できるまではローディング表示
+  // ContextやIDが準備できるまではローディング表示をします
   if (!wsContext || !myPlayerId) {
     return <div>接続中...</div>;
   }
 
-  // Contextから必要なものを分割代入で取り出す
+  // Contextから必要なものを分割代入で取り出します
   const { gameState, sendMessage } = wsContext;
 
   // ゲーム開始の演出とタイマーを制御するEffect
   useEffect(() => {
+    // gameState.currentQuestion があり、かつ演出がまだ始まっていない場合のみ実行します
     if (gameState.currentQuestion && gamePhase === 'loading') {
       const loadingTimeout = setTimeout(() => { setGamePhase('starting'); }, 1500);
       const startingTimeout = setTimeout(() => { setGamePhase('playing'); }, 2500);
+      // コンポーネントが消える際にタイマーをキャンセルします
       return () => { clearTimeout(loadingTimeout); clearTimeout(startingTimeout); };
     }
   }, [gameState.currentQuestion, gamePhase]);
@@ -61,7 +63,7 @@ const TutorialPage: React.FC = () => {
   }, [gameState.isGameFinished]);
 
 
-  // UI表示のためのヘルパーロジック
+  // --- UI表示のためのヘルパーロジック ---
   const myPlayerData = gameState.players.find(p => p.id === myPlayerId);
   let nextGateIndex: number | null = null;
   if (myPlayerData && myPlayerData.assignedGates) {
@@ -75,7 +77,7 @@ const TutorialPage: React.FC = () => {
     : null;
 
 
-  // イベントハンドラ
+  // --- イベントハンドラ ---
   const handleInput = (value: boolean) => {
     if (nextGateIndex === null || !roomId) return;
     sendMessage('playerInput', {
@@ -92,7 +94,7 @@ const TutorialPage: React.FC = () => {
   };
 
 
-  // ゲームの初期データがContext経由で届くまで待機
+  // ゲームの初期データがContext経由で届くまで待機します
   if (!gameState.currentQuestion) {
     return <div>ゲームを準備中...</div>;
   }

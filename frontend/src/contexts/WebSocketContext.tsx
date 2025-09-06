@@ -54,7 +54,15 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
             }
             break;
           }
-          // ... (turnUpdate, nextRound, gameEndのcase)
+          case 'turnUpdate':
+            setGameState(prev => ({ ...prev, currentPlayerId: message.payload.currentPlayerId }));
+            break;
+          case 'nextRound':
+            setGameState(prev => ({ ...prev, ...message.payload, playerInputs: [] }));
+            break;
+          case 'gameEnd':
+            setGameState(prev => ({ ...prev, teamScore: message.payload.finalTeamScore, isGameFinished: true }));
+            break;
         }
       };
       setWebSocket(ws);

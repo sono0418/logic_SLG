@@ -10,26 +10,33 @@ const GamePage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const myPlayerId = useContext(PlayerIdContext);
   const navigate = useNavigate();
+
+  // アプリ全体の「通信司令室」(Context)から機能を取得します
   const wsContext = useContext(WebSocketContext);
   
-  // このページが表示された際、または接続が確立された際に一度だけ入室処理を行う
+  // このページが表示された際、または接続が確立された際に一度だけ入室処理を行います
+  // これにより、無限ループを防ぎます
   useEffect(() => {
-    // ContextとroomIdが準備できたら、入室命令を出す
+    // ContextとroomIdが準備できたら、入室命令を一度だけ出します
     if (wsContext && wsContext.isConnected && roomId) {
       wsContext.joinRoom(roomId);
     }
-    // wsContext.isConnected や roomId が変わらない限り、再実行されない
+    // wsContext.isConnected や roomId が変わらない限り、再実行されません
   }, [wsContext, wsContext?.isConnected, roomId]); 
 
+  // UI（ポップアップ）の状態を管理するローカルなState
   const [isNotePopupOpen, setNotePopupOpen] = useState(false);
   const [isRankingPopupOpen, setRankingPopupOpen] = useState(false);
 
-  // ContextやIDが準備できるまではローディング表示
+  // ContextやIDが準備できるまでは、ローディング画面を表示して待機します
   if (!wsContext || !myPlayerId) {
     return <div>接続中...</div>;
   }
   
+  // Contextから必要な情報と関数を取り出します
   const { roomState, sendMessage } = wsContext;
+
+  // --- イベントハンドラ ---
 
   const handleSelectMode = (mode: 'tutorial' | 'timeAttack' | 'circuitPrediction') => {
     if (myPlayerId && roomId) {
@@ -40,7 +47,7 @@ const GamePage: React.FC = () => {
   const handleStartGame = () => {
     const selectedMode = roomState?.playerChoices?.[myPlayerId!];
     if (selectedMode && myPlayerId && roomId) {
-      // サーバーに 'startGame' メッセージを送るだけ (遷移はContextが担当)
+      // サーバーに 'startGame' メッセージを送るだけ。実際の遷移はContextが担当します
       sendMessage('startGame', { roomId, playerId: myPlayerId, mode: selectedMode });
     }
   };
@@ -60,11 +67,13 @@ const GamePage: React.FC = () => {
     }
   };
 
-  // roomStateがまだサーバーから届いていない場合もローディング表示
+  // サーバーからルーム情報が届くまでは、ローディング画面を表示します
   if (!roomState) {
     return <div>ルーム情報を読み込み中...</div>;
   }
   
+  // --- UI表示のためのヘルパー ---
+
   const isHost = roomState.hostId === myPlayerId;
   const canStartGame = isHost && !!(roomState.playerChoices && roomState.playerChoices[myPlayerId]);
 
