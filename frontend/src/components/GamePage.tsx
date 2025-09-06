@@ -11,6 +11,9 @@ const GamePage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const myPlayerId = useContext(PlayerIdContext);
   const maxPlayers = 4;
+  if (!roomId || !myPlayerId) {
+    return <div>プレイヤー情報を読み込み中...</div>;
+  }
   const { roomState, sendMessage } = useGameWebSocket(roomId!, myPlayerId);
   //ポップアップ用の
   const navigate = useNavigate(); //navigate関数を取得
