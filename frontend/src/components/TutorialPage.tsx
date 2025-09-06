@@ -10,33 +10,45 @@ const TutorialPage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const myPlayerId = useContext(PlayerIdContext);
-
-  // 新しいContextから、アプリ全体のWebSocketの状態と関数を取得
   const wsContext = useContext(WebSocketContext);
 
+  // ... (gamePhase, timer, popupsなどのuseStateは変更なし)
   const [gamePhase, setGamePhase] = useState<'loading' | 'starting' | 'playing'>('loading');
   const [timer, setTimer] = useState(0);
   const [isNotePopupOpen, setNotePopupOpen] = useState(false);
   const [isResultPopupOpen, setResultPopupOpen] = useState(false);
 
-  // Contextが準備できるまではローディング表示
+
+  // ContextやIDが準備できるまではローディング表示
   if (!wsContext || !myPlayerId) {
     return <div>プレイヤー情報を読み込み中...</div>;
   }
 
-  // Contextから必要なものを分割代入で取り出す
   const { gameState, sendMessage } = wsContext;
 
-  // ゲーム開始の演出とタイマーを制御するEffect
+  // ✨ =================================================================
+  // ✨ 修正点：ゲームの初期データが届くまで、ここで待機する
+  // ✨ =================================================================
+  // gameStateの中に、ゲーム開始の証であるcurrentQuestionが存在しない場合は、
+  // まだサーバーからの情報が届いていないと判断し、準備中画面を表示し続ける
+  if (!gameState.currentQuestion) {
+    return <div>ゲームを準備中...</div>;
+  }
+  // =================================================================
+  // ✨ この行以降は、gameState.currentQuestionが必ず存在することが保証される
+  // =================================================================
+
+
+  // (ここから下のuseEffectやヘルパー関数、JSXは以前のままでOKです)
   useEffect(() => {
-    if (gameState.currentQuestion) {
-      const loadingTimeout = setTimeout(() => { setGamePhase('starting'); }, 2000);
-      const startingTimeout = setTimeout(() => { setGamePhase('playing'); }, 3000);
+    // gamePhaseがloadingの時だけ実行し、無限ループを防ぐ
+    if (gameState.currentQuestion && gamePhase === 'loading') {
+      const loadingTimeout = setTimeout(() => { setGamePhase('starting'); }, 1500);
+      const startingTimeout = setTimeout(() => { setGamePhase('playing'); }, 2500);
       return () => { clearTimeout(loadingTimeout); clearTimeout(startingTimeout); };
     }
-  }, [gameState.currentQuestion]);
+  }, [gameState.currentQuestion, gamePhase]);
 
-  // カウントアップタイマー用のEffect
   useEffect(() => {
     let intervalId: ReturnType<typeof setInterval>;
     if (gamePhase === 'playing' && !gameState.isGameFinished) {
@@ -45,7 +57,6 @@ const TutorialPage: React.FC = () => {
     return () => clearInterval(intervalId);
   }, [gamePhase, gameState.isGameFinished]);
 
-  // ゲーム終了の合図を受け取った時の処理
   useEffect(() => {
     if (gameState.isGameFinished) {
       setResultPopupOpen(true);
@@ -53,7 +64,6 @@ const TutorialPage: React.FC = () => {
   }, [gameState.isGameFinished]);
 
 
-  // UI表示のためのヘルパーロジック
   const myPlayerData = gameState.players.find(p => p.id === myPlayerId);
   let nextGateIndex: number | null = null;
   if (myPlayerData && myPlayerData.assignedGates) {
@@ -66,8 +76,6 @@ const TutorialPage: React.FC = () => {
     ? gameState.currentQuestion.circuit[nextGateIndex] 
     : null;
 
-
-  // イベントハンドラ
   const handleInput = (value: boolean) => {
     if (nextGateIndex === null) return;
     sendMessage('playerInput', {
@@ -83,11 +91,7 @@ const TutorialPage: React.FC = () => {
     navigate(`/game/${roomId}`);
   };
 
-
-  // レンダリング
-  if (!gameState.currentQuestion) {
-    return <div>ゲームを準備中...</div>;
-  }
+  // 以前ここにあった if (!gameState.currentQuestion) は上に移動しました
 
   return (
     <div className="game-container">
@@ -103,17 +107,13 @@ const TutorialPage: React.FC = () => {
           <button onClick={() => setNotePopupOpen(true)}>ノート</button>
         </div>
       </header>
-
       <div className="status-bar">
         {gamePhase === 'loading' && <p className="status-text">通信中…</p>}
         {gamePhase === 'starting' && <p className="status-text start-text">スタート！</p>}
         {gamePhase === 'playing' && <p className="status-text timer">{`経過時間: ${timer}秒`}</p>}
       </div>
-
       <div className="content-wrapper">
         <main className="game-main">
-          {/* ... (進捗ボックス) ... */}
-
           <section className="gate-display">
             {nextGateType ? (
               <>
@@ -134,7 +134,6 @@ const TutorialPage: React.FC = () => {
             )}
           </section>
         </main>
-        
         <aside className="game-sidebar">
           <h3>チームスコア</h3>
           <p className="score">{gameState.teamScore}点</p>
