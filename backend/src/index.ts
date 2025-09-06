@@ -28,6 +28,8 @@ interface GameState {
   hostId: string | null;
 }
 const gameRooms = new Map<string, GameState>();
+const disconnectionTimers = new Map<string, NodeJS.Timeout>();
+
 const app = express();
 const port = process?.env?.PORT || 3000;
 
@@ -36,12 +38,6 @@ function generateRoomId(): string {
   const max = 99999;
   return Math.floor(Math.random() * (max - min + 1) + min).toString();
 }
-
-// ✨ =================================================================
-// ✨ 1. 猶予期間タイマーを管理するためのMapを追加
-// ✨ =================================================================
-const disconnectionTimers = new Map<string, NodeJS.Timeout>();
-
 
 // (静的ファイル配信部分は変更なし)
 app.use(express.json());
@@ -72,7 +68,6 @@ wss.on('connection', ws => {
         const { roomId, playerId } = data.payload;
         let room = gameRooms.get(roomId);
 
-        // ✨ 2. プレイヤーが再接続してきた場合、猶予期間タイマーを解除
         if (disconnectionTimers.has(playerId)) {
           clearTimeout(disconnectionTimers.get(playerId)!);
           disconnectionTimers.delete(playerId);
@@ -98,10 +93,9 @@ wss.on('connection', ws => {
           console.log(`New room ${roomId} created with status: ${room.status}`);
         }
 
-        // 既存のプレイヤー情報を更新、または新規追加
         const existingPlayerIndex = room.players.findIndex(p => p.playerId === playerId);
         if (existingPlayerIndex !== -1) {
-            room.players[existingPlayerIndex].ws = ws; // WebSocketインスタンスを更新
+            room.players[existingPlayerIndex].ws = ws;
         } else {
             const playerOrder = room.players.length + 1;
             room.players.push({ playerId, ws, playerOrder });
@@ -124,15 +118,174 @@ wss.on('connection', ws => {
         });
       }
 
-      // (startGame, playerInput, selectGameMode のロジックは変更なし)
       else if (data.type === 'startGame') {
-        // ...
+        const { roomId, playerId, mode } = data.payload;
+        const room = gameRooms.get(roomId);
+
+        // NOTE: 1人でのテスト時は room.players.length < 1 に変更してください
+        if (!room || room.players[0].playerId !== playerId || room.players.length < 2 || room.status === 'inProgress') {
+          console.log('Game start condition not met.');
+          return;
+        }
+
+        room.status = 'inProgress';
+        room.roundCount = 0;
+        room.currentPlayerIndex = 0;
+        room.currentPlayerId = room.players[0].playerId;
+
+        if (mode === 'tutorial') {
+          room.currentQuestion = tutorialCircuits[0];
+        } else {
+          room.currentQuestion = generateNewQuestion();
+        }
+        room.playerInputs = new Array(room.players.length).fill(null);
+
+        room.players.forEach(p => {
+          p.ws.send(JSON.stringify({ 
+            type: 'gameStart', 
+            payload: { 
+              currentQuestion: room.currentQuestion, 
+              currentPlayerIndex: room.currentPlayerIndex,
+              currentPlayerId: room.currentPlayerId,
+              players: room.players.map(p => ({ id: p.playerId, playerOrder: p.playerOrder })),
+              teamScore: room.teamScore,
+              mode: mode,
+            }
+          }));
+        });
+        console.log(`Game started in room ${roomId}. Status: ${room.status}`);
       }
+      
       else if (data.type === 'playerInput') {
-        // ...
+        const { roomId, playerId, inputValue } = data.payload;
+        const room = gameRooms.get(roomId);
+
+        if (!room || room.status !== 'inProgress' || room.currentPlayerId !== playerId) {
+          return;
+        }
+
+        room.playerInputs[room.currentPlayerIndex] = inputValue;
+
+        if (room.currentPlayerIndex === room.players.length - 1) {
+          let currentOutput = room.playerInputs[0] as boolean;
+          for (let i = 1; i < room.playerInputs.length; i++) {
+            const gateType = room.currentQuestion.circuit[i - 1];
+            const nextInput = room.playerInputs[i] as boolean;
+            if (gateType === 'AND') {
+              currentOutput = currentOutput && nextInput;
+            } else if (gateType === 'OR') {
+              currentOutput = currentOutput || nextInput;
+            } else if (gateType === 'NOT') {
+              currentOutput = !currentOutput;
+            }
+          }
+          const isCorrect = currentOutput === room.currentQuestion.expectedOutput;
+          if (isCorrect) {
+            room.teamScore += 10;
+          }
+          
+          room.roundCount++;
+
+          if (room.currentQuestion.isTutorial) {
+            if (room.roundCount < tutorialCircuits.length) {
+              room.currentQuestion = tutorialCircuits[room.roundCount];
+              room.currentPlayerIndex = 0;
+              room.currentPlayerId = room.players[0].playerId;
+              room.playerInputs = new Array(room.players.length).fill(null);
+
+              room.players.forEach(p => {
+                p.ws.send(JSON.stringify({
+                  type: 'nextRound',
+                  payload: {
+                    roundCount: room.roundCount,
+                    currentQuestion: room.currentQuestion,
+                    updatedTeamScore: room.teamScore,
+                  }
+                }));
+              });
+            } else {
+              room.status = 'ended';
+              room.players.forEach(p => {
+                p.ws.send(JSON.stringify({
+                  type: 'gameEnd',
+                  payload: { message: 'Tutorial complete!', finalTeamScore: room.teamScore }
+                }));
+              });
+              gameRooms.delete(roomId);
+            }
+          } else {
+            if (room.roundCount >= 3) {
+              room.status = 'ended';
+              room.players.forEach(p => {
+                p.ws.send(JSON.stringify({
+                  type: 'gameEnd',
+                  payload: {
+                    isCorrect,
+                    finalOutput: currentOutput,
+                    expectedOutput: room.currentQuestion.expectedOutput,
+                    finalTeamScore: room.teamScore,
+                  }
+                }));
+              });
+              gameRooms.delete(roomId);
+            } else {
+              const newQuestion = generateNewQuestion();
+              room.currentQuestion = newQuestion;
+              room.currentPlayerIndex = 0;
+              room.currentPlayerId = room.players[0].playerId;
+              room.playerInputs = new Array(room.players.length).fill(null);
+  
+              room.players.forEach(p => {
+                p.ws.send(JSON.stringify({
+                  type: 'nextRound',
+                  payload: {
+                    roundCount: room.roundCount,
+                    currentQuestion: room.currentQuestion,
+                    updatedTeamScore: room.teamScore,
+                  }
+                }));
+              });
+            }
+          }
+
+        } else {
+          room.currentPlayerIndex++;
+          room.currentPlayerId = room.players[room.currentPlayerIndex].playerId;
+
+          room.players.forEach(p => {
+            p.ws.send(JSON.stringify({
+              type: 'turnUpdate',
+              payload: {
+                currentPlayerId: room.currentPlayerId,
+                lastInput: inputValue,
+                circuitGateType: room.currentQuestion.circuit[room.currentPlayerIndex - 1]
+              }
+            }));
+          });
+        }
       }
+      
       else if (data.type === 'selectGameMode') {
-        // ...
+        const { roomId, playerId, mode } = data.payload;
+        const room = gameRooms.get(roomId);
+
+        // ✨ 修正点: ホスト以外のプレイヤーもモードを選択できるように修正
+        if (!room || room.status !== 'waiting') {
+            console.log(`selectGameMode denied. Room status: ${room?.status}`);
+            return;
+        }
+
+        room.playerChoices[playerId] = mode;
+        
+        const roomUpdatePayload = { 
+            roomId: room.roomId,
+            players: room.players.map(player => ({ id: player.playerId, playerOrder: player.playerOrder })),
+            playerChoices: room.playerChoices,
+            hostId: room.hostId,
+        };
+        room.players.forEach(p => {
+          p.ws.send(JSON.stringify({ type: 'roomUpdate', payload: roomUpdatePayload }));
+        });
       }
       
     } catch (error) {
@@ -141,14 +294,12 @@ wss.on('connection', ws => {
   });
 
 
-  // ✨ 3.【最重要】接続が切れた際の処理を「猶予期間」を持たせる形に修正
   ws.on('close', () => {
     console.log('Client disconnected.');
 
     const { roomId, playerId } = wsWithId;
 
     if (roomId && playerId) {
-      // 3秒後に本当に退出させるタイマーをセット
       const timerId = setTimeout(() => {
         console.log(`Grace period for ${playerId} expired. Removing from room.`);
         const room = gameRooms.get(roomId);
@@ -188,11 +339,28 @@ wss.on('connection', ws => {
   });
 });
 
-// (generateNewQuestion, server.listen は変更なし)
 function generateNewQuestion() {
-  // ...
+  const gateTypes = ['AND', 'OR', 'NOT'];
+  const circuitLength = Math.floor(Math.random() * 2) + 2;
+  const circuit = [];
+  for (let i = 0; i < circuitLength; i++) {
+    circuit.push(gateTypes[Math.floor(Math.random() * gateTypes.length)]);
+  }
+  const initialInput = Math.random() < 0.5;
+  let expectedOutput = initialInput;
+  for (let i = 0; i < circuit.length; i++) {
+    const gateType = circuit[i];
+    if (gateType === 'AND') {
+      expectedOutput = expectedOutput && (Math.random() < 0.5);
+    } else if (gateType === 'OR') {
+      expectedOutput = expectedOutput || (Math.random() < 0.5);
+    } else if (gateType === 'NOT') {
+      expectedOutput = !expectedOutput;
+    }
+  }
+  return { circuit, expectedOutput };
 }
 server.listen(port, () => {
-  // ...
+  console.log(`Server is running on port ${port}`);
 });
 
