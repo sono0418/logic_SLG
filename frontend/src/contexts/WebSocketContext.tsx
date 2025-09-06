@@ -1,10 +1,9 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useMemo, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { RoomState, GameState } from '../types';
 import { PlayerIdContext } from './PlayerIdContext';
 
-// Contextが提供するデータの型を定義
 interface WebSocketContextType {
   roomState: RoomState | null;
   gameState: GameState;
@@ -12,7 +11,6 @@ interface WebSocketContextType {
   isConnected: boolean;
 }
 
-// Contextを作成
 export const WebSocketContext = createContext<WebSocketContextType | null>(null);
 
 interface WebSocketProviderProps {
@@ -23,111 +21,67 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   const navigate = useNavigate();
   const playerId = useContext(PlayerIdContext);
   const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
-
   const [isConnected, setIsConnected] = useState(false);
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [gameState, setGameState] = useState<GameState>({
-    players: [],
-    teamScore: 0,
-    isGameFinished: false,
-    roundCount: 0,
-    currentQuestion: null,
-    playerInputs: [],
+    players: [], teamScore: 0, isGameFinished: false, roundCount: 0, currentQuestion: null, playerInputs: [],
   });
 
   useEffect(() => {
     if (playerId) {
       const ws = new WebSocket(import.meta.env.VITE_WEBSOCKET_URL);
-
-      ws.onopen = () => {
-        console.log('Global WebSocket connected');
-        setIsConnected(true);
-      };
-
+      ws.onopen = () => { console.log('Global WebSocket connected'); setIsConnected(true); };
+      ws.onclose = () => { console.log('Global WebSocket disconnected'); setIsConnected(false); };
       ws.onmessage = (event) => {
         const message = JSON.parse(event.data);
         console.log('Received message:', message);
-
         switch (message.type) {
           case 'roomUpdate':
             setRoomState(message.payload);
             if (message.payload.status === 'inProgress') {
-              setGameState(prevState => ({
-                ...prevState,
-                currentQuestion: message.payload.currentQuestion,
-                players: message.payload.players,
-                teamScore: message.payload.teamScore,
-                roundCount: message.payload.roundCount,
-                isGameFinished: message.payload.isGameFinished || false,
-              }));
+              setGameState(prevState => ({ ...prevState, ...message.payload }));
             }
             break;
-
           case 'gameStart': { 
             const { payload } = message;
-            setGameState(prevState => ({
-              ...prevState,
-              players: payload.players,
-              teamScore: payload.teamScore,
-              currentQuestion: payload.currentQuestion,
-              playerInputs: payload.playerInputs || [],
-              isGameFinished: false,
-              roundCount: 0,
-            }));
+            setGameState(prevState => ({ ...prevState, ...payload, isGameFinished: false, roundCount: 0 }));
             const mode = payload.mode || 'tutorial';
             navigate(`/play/${mode}/${payload.roomId}`); 
             break;
           }
-
           case 'turnUpdate':
-            setGameState(prev => ({
-              ...prev,
-              currentPlayerId: message.payload.currentPlayerId,
-              // lastInputなどの追加情報も必要に応じてgameStateに保存できます
-            }));
+            setGameState(prev => ({ ...prev, currentPlayerId: message.payload.currentPlayerId }));
             break;
-          
           case 'nextRound':
-            setGameState(prev => ({
-              ...prev,
-              roundCount: message.payload.roundCount,
-              currentQuestion: message.payload.currentQuestion,
-              teamScore: message.payload.updatedTeamScore,
-              playerInputs: [], // 新しいラウンドなので入力をリセット
-            }));
+            setGameState(prev => ({ ...prev, ...message.payload, playerInputs: [] }));
             break;
-            
           case 'gameEnd':
-            setGameState(prev => ({
-              ...prev,
-              teamScore: message.payload.finalTeamScore,
-              isGameFinished: true,
-            }));
+            setGameState(prev => ({ ...prev, teamScore: message.payload.finalTeamScore, isGameFinished: true }));
             break;
         }
       };
-
-      ws.onclose = () => {
-        console.log('Global WebSocket disconnected');
-        setIsConnected(false);
-      };
-
       setWebSocket(ws);
-
-      return () => {
-        ws.close();
-      };
+      return () => { ws.close(); };
     }
   }, [playerId, navigate]);
 
-  const sendMessage = (type: string, payload: object) => {
+  // ✨ useCallbackでsendMessage関数をメモ化する
+  const sendMessage = useCallback((type: string, payload: object) => {
     if (webSocket?.readyState === WebSocket.OPEN) {
       webSocket.send(JSON.stringify({ type, payload }));
     }
-  };
+  }, [webSocket]);
+
+  // ✨ useMemoでContextの値をメモ化する
+  const contextValue = useMemo(() => ({
+    roomState,
+    gameState,
+    sendMessage,
+    isConnected,
+  }), [roomState, gameState, sendMessage, isConnected]);
 
   return (
-    <WebSocketContext.Provider value={{ roomState, gameState, sendMessage, isConnected }}>
+    <WebSocketContext.Provider value={contextValue}>
       {children}
     </WebSocketContext.Provider>
   );
