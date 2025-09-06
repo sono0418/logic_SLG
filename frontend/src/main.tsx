@@ -2,11 +2,12 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
 import { PlayerIdProvider } from './contexts/PlayerIdContext';
+import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <PlayerIdProvider>
-      <App />
+        <App />
     </PlayerIdProvider>
   </React.StrictMode>,
 );

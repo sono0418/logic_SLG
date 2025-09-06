@@ -6,6 +6,7 @@ import PopUpB from './components/Popups/PopUpB';
 import PopUpC from './components/Popups/PopUpC';
 import GamePage from './components/GamePage';
 import TutorialPage from './components/TutorialPage';
+import { WebSocketProvider } from './contexts/WebSocketContext';
 
 // ポップアップの種類を定義する
 type PopUpType = 'none' | 'A' | 'B' | 'C';
@@ -21,21 +22,22 @@ const App: React.FC = () => {
 
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={
-          <div>
-            <TitleScreen onOpenPopUp={setCurrentPopUp} />
-            {currentPopUp === 'A' && <PopUpA onClose={handleClosePopUp} />}
-            {currentPopUp === 'B' && <PopUpB onClose={handleClosePopUp} />}
-            {currentPopUp === 'C' && <PopUpC onClose={handleClosePopUp} />}
-          </div>
-        } />
-
-        {/* ゲーム選択画面へのルート */}
-        <Route path="/game/:roomId" element={<GamePage />} />
-        {/*チュートリアルページへのルート*/}
-        <Route path="/play/tutorial/:roomId" element={<TutorialPage />} />
-      </Routes>
+      <WebSocketProvider>
+        <Routes>
+          <Route path="/" element={
+            <div>
+              <TitleScreen onOpenPopUp={setCurrentPopUp} />
+              {currentPopUp === 'A' && <PopUpA onClose={handleClosePopUp} />}
+              {currentPopUp === 'B' && <PopUpB onClose={handleClosePopUp} />}
+              {currentPopUp === 'C' && <PopUpC onClose={handleClosePopUp} />}
+            </div>
+          } />
+          {/* ゲーム選択画面へのルート */}
+          <Route path="/game/:roomId" element={<GamePage />} />
+          {/*チュートリアルページへのルート*/}
+          <Route path="/play/tutorial/:roomId" element={<TutorialPage />} />
+        </Routes>
+      </WebSocketProvider>
     </Router> 
   );
 };

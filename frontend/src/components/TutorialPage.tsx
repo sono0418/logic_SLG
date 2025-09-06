@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useGameWebSocket } from '../hooks/useGameWebSocket';
 import { PlayerIdContext } from '../contexts/PlayerIdContext';
+import { WebSocketContext } from '../contexts/WebSocketContext';
 import PopUpB from './Popups/PopUpB';
 import PopUpTR from './Popups/PopUpTR';
 import './TutorialPage.css';
@@ -11,15 +11,23 @@ const TutorialPage: React.FC = () => {
   const navigate = useNavigate();
   const myPlayerId = useContext(PlayerIdContext);
 
-  // useGameWebSocketフックから、最新のゲーム状態とメッセージ送信関数を取得
-  const { gameState, sendMessage } = useGameWebSocket(roomId!, myPlayerId!);
+  // 新しいContextから、アプリ全体のWebSocketの状態と関数を取得
+  const wsContext = useContext(WebSocketContext);
 
   const [gamePhase, setGamePhase] = useState<'loading' | 'starting' | 'playing'>('loading');
   const [timer, setTimer] = useState(0);
   const [isNotePopupOpen, setNotePopupOpen] = useState(false);
   const [isResultPopupOpen, setResultPopupOpen] = useState(false);
 
-  // (useEffectフックは変更なし)
+  // Contextが準備できるまではローディング表示
+  if (!wsContext || !myPlayerId) {
+    return <div>プレイヤー情報を読み込み中...</div>;
+  }
+
+  // Contextから必要なものを分割代入で取り出す
+  const { gameState, sendMessage } = wsContext;
+
+  // ゲーム開始の演出とタイマーを制御するEffect
   useEffect(() => {
     if (gameState.currentQuestion) {
       const loadingTimeout = setTimeout(() => { setGamePhase('starting'); }, 2000);
@@ -28,6 +36,7 @@ const TutorialPage: React.FC = () => {
     }
   }, [gameState.currentQuestion]);
 
+  // カウントアップタイマー用のEffect
   useEffect(() => {
     let intervalId: ReturnType<typeof setInterval>;
     if (gamePhase === 'playing' && !gameState.isGameFinished) {
@@ -36,6 +45,7 @@ const TutorialPage: React.FC = () => {
     return () => clearInterval(intervalId);
   }, [gamePhase, gameState.isGameFinished]);
 
+  // ゲーム終了の合図を受け取った時の処理
   useEffect(() => {
     if (gameState.isGameFinished) {
       setResultPopupOpen(true);
@@ -43,35 +53,23 @@ const TutorialPage: React.FC = () => {
   }, [gameState.isGameFinished]);
 
 
-  // ✨ =================================================================
-  // ✨ UI表示のための新しいヘルパーロジック
-  // ✨ =================================================================
-  
-  // 自分自身のプレイヤー情報をgameStateから見つける
+  // UI表示のためのヘルパーロジック
   const myPlayerData = gameState.players.find(p => p.id === myPlayerId);
-
-  // 自分に次にやるべき仕事（ゲート）があるか探す
   let nextGateIndex: number | null = null;
   if (myPlayerData && myPlayerData.assignedGates) {
-    // 担当ゲートの中で、まだ入力されていない最初のものを探す
     const nextGate = myPlayerData.assignedGates.find(gateIdx => gameState.playerInputs[gateIdx] === null);
     if (nextGate !== undefined) {
       nextGateIndex = nextGate;
     }
   }
-  
-  // 表示するゲートのタイプ
   const nextGateType = (nextGateIndex !== null && gameState.currentQuestion) 
     ? gameState.currentQuestion.circuit[nextGateIndex] 
     : null;
 
 
-  // -- イベントハンドラの修正 --
+  // イベントハンドラ
   const handleInput = (value: boolean) => {
-    // 自分の担当ゲートがなければ何もしない
     if (nextGateIndex === null) return;
-
-    // ✨ どのゲートへの入力かを伝えるために "gateIndex" を追加
     sendMessage('playerInput', {
       roomId,
       playerId: myPlayerId,
@@ -86,7 +84,7 @@ const TutorialPage: React.FC = () => {
   };
 
 
-  // -- レンダリング --
+  // レンダリング
   if (!gameState.currentQuestion) {
     return <div>ゲームを準備中...</div>;
   }
@@ -114,10 +112,9 @@ const TutorialPage: React.FC = () => {
 
       <div className="content-wrapper">
         <main className="game-main">
-          {/* ... (進捗ボックスのロジックも将来的には更新が必要) ... */}
+          {/* ... (進捗ボックス) ... */}
 
           <section className="gate-display">
-            {/* ✨ 表示ロジックを全面的に変更 */}
             {nextGateType ? (
               <>
                 <h4>あなたの次の担当: {nextGateIndex! + 1}番目の「{nextGateType}」ゲート</h4>
@@ -145,7 +142,7 @@ const TutorialPage: React.FC = () => {
           <ul className="player-list">
             {gameState.players.map(player => (
               <li key={player.id}>
-                {player.playerOrder}P : 担当ゲート {player.assignedGates.join(', ')}
+                {player.playerOrder}P : 担当 {player.assignedGates.join(', ')}番
               </li>
             ))}
           </ul>
