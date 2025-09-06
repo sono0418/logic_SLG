@@ -11,17 +11,17 @@ const GamePage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const myPlayerId = useContext(PlayerIdContext);
   const navigate = useNavigate();
-
   const wsContext = useContext(WebSocketContext);
 
+  const [isNotePopupOpen, setNotePopupOpen] = useState(false);
+  const [isRankingPopupOpen, setRankingPopupOpen] = useState(false);
+
+  // 入室処理
   useEffect(() => {
     if (wsContext && wsContext.isConnected && roomId) {
       wsContext.joinRoom(roomId);
     }
   }, [wsContext, wsContext?.isConnected, roomId]);
-
-  const [isNotePopupOpen, setNotePopupOpen] = useState(false);
-  const [isRankingPopupOpen, setRankingPopupOpen] = useState(false);
 
   if (!wsContext || !myPlayerId) {
     return <div>接続中...</div>;
@@ -29,6 +29,7 @@ const GamePage: React.FC = () => {
 
   const { roomState, sendMessage } = wsContext;
 
+  // --- イベントハンドラ ---
   const handleSelectMode = (mode: 'tutorial' | 'timeAttack' | 'circuitPrediction') => {
     if (myPlayerId && roomId) {
       sendMessage('selectGameMode', { roomId, playerId: myPlayerId, mode });
@@ -57,16 +58,20 @@ const GamePage: React.FC = () => {
     }
   };
 
-  if (!roomState) {
+  // --- roomState が揃っていないときはローディング ---
+  if (!roomState || !roomState.players) {
     return <div>ルーム情報を読み込み中...</div>;
   }
 
+  // --- 安全にプロパティを参照 ---
+  const players = roomState.players ?? [];
+  const playerChoices = roomState.playerChoices ?? {};
+
   const isHost = roomState.hostId === myPlayerId;
-  const canStartGame = isHost && !!(roomState.playerChoices && roomState.playerChoices[myPlayerId]);
+  const canStartGame = isHost && !!playerChoices[myPlayerId];
 
   const getPlayersForMode = (mode: string) => {
-    if (!roomState?.playerChoices || !roomState?.players) return [];
-    return roomState.players.filter(p => roomState.playerChoices[p.id] === mode);
+    return players.filter(p => playerChoices[p.id] === mode);
   };
 
   return (
@@ -74,7 +79,7 @@ const GamePage: React.FC = () => {
       <header className="page-header">
         <h1>ゲーム選択</h1>
         <div className="room-id-display">
-          <span>ルームID: {roomState.roomId}</span>
+          <span>ルームID: {roomState.roomId ?? '---'}</span>
           <button onClick={handleCopyRoomId}>コピー</button>
         </div>
       </header>
@@ -84,7 +89,7 @@ const GamePage: React.FC = () => {
           <div className="mode-options">
             <button
               onClick={() => handleSelectMode('tutorial')}
-              className={`mode-option ${roomState.playerChoices?.[myPlayerId] === 'tutorial' ? 'my-choice' : ''}`}
+              className={`mode-option ${playerChoices[myPlayerId] === 'tutorial' ? 'my-choice' : ''}`}
             >
               チュートリアル
               <div className="voters">
@@ -95,7 +100,7 @@ const GamePage: React.FC = () => {
             </button>
             <button
               onClick={() => handleSelectMode('timeAttack')}
-              className={`mode-option ${roomState.playerChoices?.[myPlayerId] === 'timeAttack' ? 'my-choice' : ''}`}
+              className={`mode-option ${playerChoices[myPlayerId] === 'timeAttack' ? 'my-choice' : ''}`}
             >
               タイムアタック
               <div className="voters">
@@ -106,7 +111,7 @@ const GamePage: React.FC = () => {
             </button>
             <button
               onClick={() => handleSelectMode('circuitPrediction')}
-              className={`mode-option ${roomState.playerChoices?.[myPlayerId] === 'circuitPrediction' ? 'my-choice' : ''}`}
+              className={`mode-option ${playerChoices[myPlayerId] === 'circuitPrediction' ? 'my-choice' : ''}`}
             >
               回路予測
               <div className="voters">
@@ -135,7 +140,7 @@ const GamePage: React.FC = () => {
         <section className="player-status-section">
           <div className="player-slots">
             {[...Array(4)].map((_, index) => {
-              const player = roomState.players?.find(p => p.playerOrder === index + 1);
+              const player = players.find(p => p.playerOrder === index + 1);
               return (
                 <div key={index} className={`player-slot ${player ? 'active' : 'inactive'}`}>
                   <span className="player-order-label">{index + 1}P</span>
