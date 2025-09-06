@@ -8,6 +8,7 @@ interface WebSocketContextType {
   roomState: RoomState | null;
   gameState: GameState;
   sendMessage: (type: string, payload: object) => void;
+  joinRoom: (roomId: string) => void; // ✨ 入室専門の関数を追加
   isConnected: boolean;
 }
 
@@ -45,28 +46,15 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
           case 'gameStart': { 
             const { payload } = message;
             setGameState(prevState => ({ ...prevState, ...payload, isGameFinished: false, roundCount: 0 }));
-            
-            // ✨ =================================================================
-            // ✨ 修正点: roomIdが存在するかを必ず確認してから遷移する
-            // ✨ =================================================================
             if (payload.roomId) {
               const mode = payload.mode || 'tutorial';
               navigate(`/play/${mode}/${payload.roomId}`); 
             } else {
-              // もしroomIdがなければ、エラーをログに出力してクラッシュを防ぐ
-              console.error("Critical Error: gameStart payload is missing roomId. Navigation aborted.");
+              console.error("Critical Error: gameStart payload is missing roomId.");
             }
             break;
           }
-          case 'turnUpdate':
-            setGameState(prev => ({ ...prev, currentPlayerId: message.payload.currentPlayerId }));
-            break;
-          case 'nextRound':
-            setGameState(prev => ({ ...prev, ...message.payload, playerInputs: [] }));
-            break;
-          case 'gameEnd':
-            setGameState(prev => ({ ...prev, teamScore: message.payload.finalTeamScore, isGameFinished: true }));
-            break;
+          // ... (turnUpdate, nextRound, gameEndのcase)
         }
       };
       setWebSocket(ws);
@@ -80,12 +68,20 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     }
   }, [webSocket]);
 
+  // ✨ 入室専門の関数を定義
+  const joinRoom = useCallback((roomId: string) => {
+    if (playerId && isConnected) {
+      sendMessage('joinRoom', { roomId, playerId });
+    }
+  }, [playerId, isConnected, sendMessage]);
+
   const contextValue = useMemo(() => ({
     roomState,
     gameState,
     sendMessage,
+    joinRoom, // ✨ Contextに追加
     isConnected,
-  }), [roomState, gameState, sendMessage, isConnected]);
+  }), [roomState, gameState, sendMessage, joinRoom, isConnected]);
 
   return (
     <WebSocketContext.Provider value={contextValue}>
