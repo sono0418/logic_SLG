@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import pool from './db/index';
 
 /*何かで間違えてDBリセットしたくなった時に使う
