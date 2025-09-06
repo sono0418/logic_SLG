@@ -16,6 +16,7 @@ const TutorialPage: React.FC = () => {
 
   // このページに直接アクセス(リロード)した際に、再入室するためのuseEffectです
   useEffect(() => {
+    // Contextが利用可能で、接続が確立しており、roomIdがあれば入室します
     if (wsContext && wsContext.isConnected && roomId) {
       wsContext.joinRoom(roomId);
     }
@@ -152,7 +153,7 @@ const TutorialPage: React.FC = () => {
           <ul className="player-list">
             {gameState.players.map(player => (
               <li key={player.id}>
-                {player.playerOrder}P : 担当 {player.assignedGates.join(', ')}番
+                {player.playerOrder}P : 担当 {player.assignedGates.map(g => g + 1).join(', ')}番
               </li>
             ))}
           </ul>
@@ -163,4 +164,3 @@ const TutorialPage: React.FC = () => {
 };
 
 export default TutorialPage;
-
