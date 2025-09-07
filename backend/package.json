@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "build": "npm run build:client && npm run build:server",
-    "bbuild:client": "cd .. && npm run build --prefix .",
+    "build:client": "cd .. && npm run build --prefix .",
     "init-db": "ts-node src/init-db.ts",
     "build:server": "tsc --project ./",
     "start": "node ./dist/index.js",
