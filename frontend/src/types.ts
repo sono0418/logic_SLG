@@ -21,13 +21,16 @@ export interface RoomState {
 
 //ゲームプレイ画面の状態
 export interface GameState {
-  players: GamePlayer[]; // ゲーム中は、担当ゲートを持つGamePlayer型
+  players: GamePlayer[];
   teamScore: number;
   isGameFinished: boolean;
   roundCount: number;
-  currentQuestion: {
-    circuit: string[];
-  } | null;
+  currentQuestion: Question | null; // ★ Question型を使用
   playerInputs: (boolean | null)[];
 }
 
+export interface Question {
+  circuit: string[];
+  expectedOutput: boolean | { C: boolean; S: boolean; };
+  isTutorial?: boolean;
+}

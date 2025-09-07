@@ -1,6 +1,7 @@
 // src/hooks/useGameWebSocket.ts
-import { useState, useEffect} from 'react';
-import type { RoomState, GameState} from '../types';
+
+import { useState, useEffect, useRef } from 'react';
+import type { RoomState, GameState, GamePlayer, Question } from '../types';
 
 // WebSocket接続を管理するシングルトン
 class WebSocketManager {
@@ -60,7 +61,6 @@ class WebSocketManager {
 const wsManager = WebSocketManager.getInstance();
 
 export const useGameWebSocket = (roomId: string, playerId: string) => {
-  // `useNavigate`を削除
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
 
@@ -71,16 +71,16 @@ export const useGameWebSocket = (roomId: string, playerId: string) => {
     switch (message.type) {
       case 'roomUpdate':
         setRoomState(message.payload);
-        setGameState(prev => prev ? { ...prev, players: message.payload.players } : null);
+        // `prev`にRoomState型を明示
+        setGameState((prev: GameState | null) => prev ? { ...prev, players: message.payload.players } : null);
         break;
 
       case 'gameStart':
         setGameState(message.payload);
-        // ★ 画面遷移は、GamePage.tsxのhandleStartGameで行う
         break;
 
       case 'nextRound':
-        setGameState(prev => prev ? {
+        setGameState((prev: GameState | null) => prev ? {
           ...prev,
           roundCount: message.payload.roundCount,
           currentQuestion: message.payload.currentQuestion,
@@ -90,7 +90,7 @@ export const useGameWebSocket = (roomId: string, playerId: string) => {
         break;
 
       case 'gameEnd':
-        setGameState(prev => prev ? {
+        setGameState((prev: GameState | null) => prev ? {
           ...prev,
           isGameFinished: true,
           teamScore: message.payload.finalTeamScore,
@@ -98,7 +98,7 @@ export const useGameWebSocket = (roomId: string, playerId: string) => {
         break;
 
       case 'playerInputUpdate':
-        setGameState(prev => {
+        setGameState((prev: GameState | null) => {
           if (!prev) return null;
           const newPlayerInputs = [...prev.playerInputs];
           const { gateIndex, inputValue } = message.payload;
@@ -110,33 +110,19 @@ export const useGameWebSocket = (roomId: string, playerId: string) => {
   };
 
   useEffect(() => {
-    const ws = WebSocketManager.getInstance().getWs();
+    wsManager.addMessageListener(handleMessage);
 
-    const handleOpen = () => {
-    console.log('WebSocket connected');
-    // WebSocket接続が確立されたら、サーバーに状態の同期を要求する
+    const ws = wsManager.getWs();
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({
         type: 'syncState',
         payload: { roomId, playerId },
       }));
     }
-  };
 
-
-
-  if (ws) {
-    // 接続イベントとメッセージイベントのリスナーを設定
-    ws.addEventListener('open', handleOpen);
-    ws.addEventListener('message', handleMessage);
-  }
-
-  return () => {
-    if (ws) {
-      // クリーンアップ時にリスナーを削除
-      ws.removeEventListener('open', handleOpen);
-      ws.removeEventListener('message', handleMessage);
-    }};
+    return () => {
+      wsManager.removeMessageListener(handleMessage);
+    };
   }, [roomId, playerId]);
 
   const sendMessage = (type: string, payload: object) => {
