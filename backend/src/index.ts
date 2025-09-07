@@ -5,6 +5,7 @@ import { WebSocketServer } from 'ws';
 import apiRouter from './routes/api';
 import { setupWebSocketServer } from './realtime';
 import WebSocket from "ws";
+import axios from 'axios';
 
 const tutorialCircuits = [
   { circuit: ['AND', 'NOT'], expectedOutput: false, isTutorial: true },
