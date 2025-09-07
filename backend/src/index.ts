@@ -34,7 +34,7 @@ interface GameState {
 const gameRooms = new Map<string, GameState>();
 const app = express();
 const port = process?.env?.PORT || 3000;
-const staticPath = path.join(__dirname, '..', 'dist');
+const staticPath = path.join(__dirname, '..', '..', 'dist');
 
 function generateRoomId(): string {
   const min = 10000;
@@ -113,7 +113,7 @@ app.post('/api/startGame', (req, res) => {
 });
 
 app.get('*', (req, res) => {
-  res.sendFile(path.join(staticPath, 'index.html'));
+  res.sendFile(path.join(__dirname, '..', '..', 'dist', 'index.html'));
 });
 
 const server = http.createServer(app);
