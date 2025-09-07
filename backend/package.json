@@ -3,9 +3,11 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "build": "cd ../frontend && npm install && npm run build && cp -r dist/ ../backend/",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "vite build",
     "init-db": "ts-node src/init-db.ts",
-    "start": "ts-node src/index.ts",
+    "build:server": "tsc --project ./backend",
+    "start": "node ./backend/dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
