@@ -1,12 +1,21 @@
 {
-  "name": "logic_slg",
+  "name": "logic_SLG",
   "version": "1.0.0",
-  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build:client": "vite build",
+    "build:server": "tsc --project ./backend",
+    "build": "npm run build:client && npm run build:server",
+    "start": "node ./backend/dist/index.js",
+    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
+    "dev:client": "vite --host",
+    "dev:server": "nodemon --watch backend --exec ts-node backend/src/index.ts"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": ""
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2",
+    "vite": "^5.0.0"
+  }
 }
