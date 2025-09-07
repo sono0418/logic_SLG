@@ -110,19 +110,33 @@ export const useGameWebSocket = (roomId: string, playerId: string) => {
   };
 
   useEffect(() => {
-    wsManager.addMessageListener(handleMessage);
+    const ws = WebSocketManager.getInstance().getWs();
 
-    const ws = wsManager.getWs();
+    const handleOpen = () => {
+    console.log('WebSocket connected');
+    // WebSocket接続が確立されたら、サーバーに状態の同期を要求する
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({
         type: 'syncState',
         payload: { roomId, playerId },
       }));
     }
+  };
 
-    return () => {
-      wsManager.removeMessageListener(handleMessage);
-    };
+
+
+  if (ws) {
+    // 接続イベントとメッセージイベントのリスナーを設定
+    ws.addEventListener('open', handleOpen);
+    ws.addEventListener('message', handleMessage);
+  }
+
+  return () => {
+    if (ws) {
+      // クリーンアップ時にリスナーを削除
+      ws.removeEventListener('open', handleOpen);
+      ws.removeEventListener('message', handleMessage);
+    }};
   }, [roomId, playerId]);
 
   const sendMessage = (type: string, payload: object) => {
