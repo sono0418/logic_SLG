@@ -34,6 +34,7 @@ interface GameState {
 const gameRooms = new Map<string, GameState>();
 const app = express();
 const port = process?.env?.PORT || 3000;
+const staticPath = path.join(__dirname, '..', 'dist');
 
 function generateRoomId(): string {
   const min = 10000;
@@ -42,8 +43,75 @@ function generateRoomId(): string {
 }
 
 app.use(express.json());
-const staticPath = path.join(__dirname, '..', 'dist');
 app.use(express.static(staticPath));
+
+// ルーム作成API
+app.post('/api/createRoom', (req, res) => {
+  const newRoomId = generateRoomId();
+  const { playerId } = req.body;
+  if (gameRooms.has(newRoomId)) {
+    return res.status(500).send('Failed to create room due to ID conflict.');
+  }
+  const newRoom: GameState = {
+    roomId: newRoomId,
+    players: [{ playerId, ws: null as any, playerOrder: 1 }],
+    currentQuestion: { circuit: [], expectedOutput: false },
+    currentPlayerIndex: 0,
+    playerInputs: [],
+    status: 'waiting',
+    currentPlayerId: null,
+    roundCount: 0,
+    teamScore: 0,
+    playerChoices: {},
+    hostId: playerId,
+  };
+  gameRooms.set(newRoomId, newRoom);
+  console.log(`Room ${newRoomId} created by player ${playerId}.`);
+  res.status(200).json({ roomId: newRoomId });
+});
+
+// ルーム入室API
+app.post('/api/joinRoom', (req, res) => {
+  const { roomId, playerId } = req.body;
+  const room = gameRooms.get(roomId);
+
+  if (!room) {
+    return res.status(404).send('Room not found.');
+  }
+  
+  if (room.players.some(p => p.playerId === playerId)) {
+    return res.status(200).send('Already in the room.');
+  }
+
+  const playerOrder = room.players.length + 1;
+  room.players.push({ playerId, ws: null as any, playerOrder });
+  console.log(`Player ${playerId} joined room ${roomId}.`);
+  res.status(200).send('Successfully joined room.');
+});
+
+// ゲーム開始API
+app.post('/api/startGame', (req, res) => {
+  const { roomId, playerId, mode } = req.body;
+  const room = gameRooms.get(roomId);
+
+  if (!room || room.hostId !== playerId || room.status !== 'waiting') {
+    return res.status(403).json({ message: 'Game start conditions not met.' });
+  }
+
+  // ここにゲーム開始のロジックを実装
+  room.status = 'inProgress';
+  // ... (プレイヤーのシャッフルや問題の割り当てなど) ...
+  
+  // WebSocket経由でゲーム開始を通知
+  room.players.forEach(p => {
+    if (p.ws?.readyState === WebSocket.OPEN) {
+      p.ws.send(JSON.stringify({ type: 'gameStart', payload: { /* ... */ } }));
+    }
+  });
+
+  res.status(200).send('Game started successfully.');
+});
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(staticPath, 'index.html'));
 });
