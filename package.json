@@ -1,5 +1,5 @@
 {
-  "name": "logic_SLG",
+  "name": "logicslg",
   "version": "1.0.0",
   "scripts": {
     "build:client": "vite build",
