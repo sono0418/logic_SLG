@@ -1,85 +1,133 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import type { RoomState, GameState} from '../types'; // GamePlayerもインポート
+// src/hooks/useGameWebSocket.ts
+import { useState, useEffect} from 'react';
+import type { RoomState, GameState} from '../types';
+
+// WebSocket接続を管理するシングルトン
+class WebSocketManager {
+  private static instance: WebSocketManager;
+  private ws: WebSocket | null = null;
+  private listeners: ((event: MessageEvent) => void)[] = [];
+
+  private constructor() {
+    this.connect();
+  }
+
+  public static getInstance(): WebSocketManager {
+    if (!WebSocketManager.instance) {
+      WebSocketManager.instance = new WebSocketManager();
+    }
+    return WebSocketManager.instance;
+  }
+
+  private connect() {
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+    this.ws = new WebSocket(import.meta.env.VITE_WEBSOCKET_URL);
+
+    this.ws.onmessage = (event) => {
+      this.listeners.forEach(listener => listener(event));
+    };
+
+    this.ws.onclose = () => {
+      console.log('WebSocket disconnected. Attempting to reconnect...');
+    };
+
+    this.ws.onerror = (error) => console.error('WebSocket error:', error);
+  }
+
+  public addMessageListener(listener: (event: MessageEvent) => void) {
+    this.listeners.push(listener);
+  }
+
+  public removeMessageListener(listener: (event: MessageEvent) => void) {
+    this.listeners = this.listeners.filter(l => l !== listener);
+  }
+
+  public sendMessage(message: any) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(message));
+    } else {
+      console.error('WebSocket not connected. Message not sent.');
+    }
+  }
+
+  public getWs(): WebSocket | null {
+    return this.ws;
+  }
+}
+
+const wsManager = WebSocketManager.getInstance();
 
 export const useGameWebSocket = (roomId: string, playerId: string) => {
-  const navigate = useNavigate();
+  // `useNavigate`を削除
   const [roomState, setRoomState] = useState<RoomState | null>(null);
-  
-  // ✨ 1. GameStateの初期値を、新しい設計図(types.ts)に合わせる
-  const [gameState, setGameState] = useState<GameState>({
-    players: [],
-    teamScore: 0,
-    isGameFinished: false,
-    roundCount: 0,
-    currentQuestion: null,
-    playerInputs: [],
-  });
+  const [gameState, setGameState] = useState<GameState | null>(null);
 
-  const webSocketRef = useRef<WebSocket | null>(null);
+  const handleMessage = (event: MessageEvent) => {
+    const message = JSON.parse(event.data);
+    console.log('Received message:', message);
+
+    switch (message.type) {
+      case 'roomUpdate':
+        setRoomState(message.payload);
+        setGameState(prev => prev ? { ...prev, players: message.payload.players } : null);
+        break;
+
+      case 'gameStart':
+        setGameState(message.payload);
+        // ★ 画面遷移は、GamePage.tsxのhandleStartGameで行う
+        break;
+
+      case 'nextRound':
+        setGameState(prev => prev ? {
+          ...prev,
+          roundCount: message.payload.roundCount,
+          currentQuestion: message.payload.currentQuestion,
+          teamScore: message.payload.updatedTeamScore,
+          playerInputs: new Array(prev.players.length).fill(null),
+        } : null);
+        break;
+
+      case 'gameEnd':
+        setGameState(prev => prev ? {
+          ...prev,
+          isGameFinished: true,
+          teamScore: message.payload.finalTeamScore,
+        } : null);
+        break;
+
+      case 'playerInputUpdate':
+        setGameState(prev => {
+          if (!prev) return null;
+          const newPlayerInputs = [...prev.playerInputs];
+          const { gateIndex, inputValue } = message.payload;
+          newPlayerInputs[gateIndex] = inputValue;
+          return { ...prev, playerInputs: newPlayerInputs };
+        });
+        break;
+    }
+  };
 
   useEffect(() => {
-    const ws = new WebSocket(import.meta.env.VITE_WEBSOCKET_URL);
-    webSocketRef.current = ws;
+    wsManager.addMessageListener(handleMessage);
 
-    ws.onopen = () => {
-      console.log('WebSocket connected');
+    const ws = wsManager.getWs();
+    if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({
-        type: 'joinRoom',
+        type: 'syncState',
         payload: { roomId, playerId },
       }));
-    };
-
-    ws.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      console.log('Received message:', message);
-
-      switch (message.type) {
-        case 'roomUpdate':
-          setRoomState(message.payload);
-          // (将来的に、ゲーム中の再接続のためにここも賢くします)
-          break;
-
-        // ✨ 2. gameStartで受け取るデータ形式の変更に対応
-        case 'gameStart': { 
-          console.log('Received gameStart signal. Saving state and navigating...');
-          
-          const { payload } = message;
-
-          // 新しいペイロードからgameStateを構築
-          setGameState(prevState => ({
-            ...prevState,
-            players: payload.players, // サーバーからのプレイヤーリスト(assignedGatesを含む)
-            teamScore: payload.teamScore,
-            currentQuestion: payload.currentQuestion,
-            playerInputs: payload.playerInputs,
-            isGameFinished: false,
-            roundCount: 0,
-          }));
-          
-          const mode = payload.mode || 'tutorial'; // modeがない場合のフォールバック
-          navigate(`/play/${mode}/${roomId}`); 
-          break;
-        }
-
-        // ... (turnUpdate, roundResult, gameEndはステップ3でUIと合わせて修正します)
-      }
-    };
-
-    ws.onclose = () => console.log('WebSocket disconnected');
-    ws.onerror = (error) => console.error('WebSocket error:', error);
+    }
 
     return () => {
-      ws.close();
+      wsManager.removeMessageListener(handleMessage);
     };
-  }, [roomId, playerId, navigate]);
+  }, [roomId, playerId]);
 
   const sendMessage = (type: string, payload: object) => {
-    if (webSocketRef.current?.readyState === WebSocket.OPEN) {
-      webSocketRef.current.send(JSON.stringify({ type, payload }));
-    }
+    wsManager.sendMessage({ type, payload });
   };
 
   return { roomState, gameState, sendMessage };
 };
-
