@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "build": "npm run build:client && npm run build:server",
+    "build": "cd .. && vite build",
     "build:client": "vite build",
     "init-db": "ts-node src/init-db.ts",
     "build:server": "tsc --project ./backend",
@@ -22,7 +22,8 @@
     "@types/uuid": "^10.0.0",
     "@types/ws": "^8.18.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vite": "^5.0.0" 
   },
   "dependencies": {
     "@types/axios": "^0.9.36",
