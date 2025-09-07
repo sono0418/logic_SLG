@@ -13,7 +13,7 @@ interface PlayerScore {
 }
 
 // バックエンドのURLを環境変数から取得
-// ローカル環境では`http://localhost:3000/api/ranking`が使われる
+// ローカル環境ではhttp://localhost:3000/api/rankingが使われる
 // Renderのような本番環境では、設定された環境変数の値が使われる
 const API_URL = "https://logic-slg.onrender.com/api/ranking";
 
@@ -56,6 +56,9 @@ const PopUpC: React.FC<PopUpProps> = ({ onClose }) => {
         {isLoading ? (
           <p>ランキングを読み込み中...</p>
         ) : (
+          scores.length === 0 ? (
+            <p>ランキングがありません。</p>
+          ) : (
           <ol>
             {scores.map((player, index) => (
               <li key={player.id}>
@@ -63,6 +66,7 @@ const PopUpC: React.FC<PopUpProps> = ({ onClose }) => {
               </li>
             ))}
           </ol>
+          )
         )}
       </div>
     </div>
