@@ -1,30 +1,9 @@
 // src/tutorial.ts
 import { WebSocket } from "ws";
 import { GameState } from './realtime'; // realtime.tsからGameStateインターフェースをインポート
+import { Problems } from './problems';
 
-export const tutorialCircuits = [
-  // 問題1: A=false, B=false
-  {
-    circuit: ['AND', 'OR', 'NOT', 'AND'],
-    inputAssignments: { A: false, B: false },
-    expectedOutput: { C: false, S: false },
-    isTutorial: true
-  },
-  // 問題2: A=false, B=true
-  {
-    circuit: ['AND', 'OR', 'NOT', 'AND'],
-    inputAssignments: { A: false, B: true },
-    expectedOutput: { C: false, S: true },
-    isTutorial: true
-  },
-  // 問題3: A=true, B=true
-  {
-    circuit: ['AND', 'OR', 'NOT', 'AND'],
-    inputAssignments: { A: true, B: true },
-    expectedOutput: { C: true, S: false },
-    isTutorial: true
-  }
-];
+export const tutorialCircuits = Problems.filter(problem => problem.isTutorial);
 
 /**
  * チュートリアルモードのゲームロジックを処理します。

@@ -19,7 +19,6 @@ const TutorialPage: React.FC = () => {
   const [isNotePopupOpen, setNotePopupOpen] = useState(false);
   const [isResultPopupOpen, setResultPopupOpen] = useState(false);
 
-  // ... (useEffectフックは変更なし) ...
   useEffect(() => {
     if (gameState.currentQuestion) {
       const loadingTimeout = setTimeout(() => { setGamePhase('starting'); }, 2000);
