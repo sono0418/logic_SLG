@@ -1,22 +1,44 @@
 // src/hooks/useGameWebSocket.ts
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { RoomState, GameState } from '../types'; // 型定義ファイルをインポート
 
-const WEBSOCKET_URL = 'wss://logic-slg.onrender.com'; 
+// WebSocketサーバーのURL
+const WEBSOCKET_URL = 'wss://logic-slg.onrender.com';
+
+// 新しいGameStateインターフェースを定義
+export interface GameState {
+  roomId: string;
+  players: { playerId: string, ws: WebSocket, playerOrder: number }[];
+  roundCount: number;
+  teamScore: number;
+  status: 'waiting' | 'inProgress' | 'ended' | 'scoring';
+  hostId: string | null;
+
+  currentQuestion: {
+    circuit: {
+      gates: any[];
+      outputs: any;
+    };
+    inputAssignments: { [key: string]: boolean };
+    expectedOutput: { C: boolean; S: boolean; };
+    isTutorial?: boolean;
+  };
+
+  gateValues: { [key: string]: boolean | null };
+  playerInputLog: {
+    playerId: string;
+    gateId: string;
+    inputValue: boolean;
+    isCorrect: boolean;
+    timestamp: number;
+  }[];
+
+  playerGateAssignments: { [playerId: string]: string[] };
+}
 
 export const useGameWebSocket = (roomId: string, playerId: string) => {
-  const navigate = useNavigate(); 
-  const [roomState, setRoomState] = useState<RoomState | null>(null);
-  const [gameState, setGameState] = useState<GameState>({
-    currentQuestion: null,
-    currentPlayerId: null,
-    players: [],
-    teamScore: 0,
-    isGameFinished: false,
-    roundCount: 0,
-  });
-
+  const navigate = useNavigate();
+  const [gameState, setGameState] = useState<GameState | null>(null);
   const webSocketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -36,69 +58,17 @@ export const useGameWebSocket = (roomId: string, playerId: string) => {
       console.log('Received message:', message);
 
       switch (message.type) {
-        //  playerChoices を含む新しい形式に対応
         case 'roomUpdate':
-          setRoomState(message.payload);
-          if (message.payload.status === 'inProgress') {
-            console.log('Received game state sync via roomUpdate.');
-            setGameState(prevState => ({
-              ...prevState,
-              currentQuestion: message.payload.currentQuestion,
-              currentPlayerId: message.payload.currentPlayerId,
-              // playersの形式をGameStateに合わせる
-              players: message.payload.players.map((p: any) => ({ id: p.id, playerOrder: p.playerOrder, score: 0 })),
-              teamScore: message.payload.teamScore,
-              roundCount: message.payload.roundCount,
-              isGameFinished: message.payload.isGameFinished || false,
-            }));
-          }
-          break;
-
-        case 'gameStart': { 
-          console.log('Received gameStart signal. Saving state and navigating...');
-          // 1. payloadから `mode` を一度だけ取り出す
-          const mode = message.payload.mode;
-
-          // 2. サーバーから送られてきたゲームの初期状態を保存する
-          setGameState(prevState => ({
-            ...prevState,
-            currentQuestion: message.payload.currentQuestion,
-            currentPlayerId: message.payload.currentPlayerId,
-            players: message.payload.players,
-            teamScore: message.payload.teamScore,
-            roundCount: 0,
-            isGameFinished: false,
-          }));
-
-          // 3. 準備した `mode` を使って、全員で画面遷移する
-          navigate(`/play/${mode}/${roomId}`); 
-          break;
-        }
-
-        case 'turnUpdate':
-          setGameState(prev => ({
-            ...prev,
-            currentPlayerId: message.payload.currentPlayerId,
-            lastInput: message.payload.lastInput,
-            roundResult: undefined,
-          }));
-          break;
-        
-        case 'roundResult':
-          setGameState(prev => ({
-            ...prev,
-            teamScore: message.payload.updatedTeamScore, // teamScore を更新
-            roundResult: message.payload,
-          }));
-          break;
-
-        // ✨ チームスコア形式に対応
+        case 'gameStart':
+        case 'gameStateUpdate':
+        case 'nextRound':
+        case 'roundComplete':
         case 'gameEnd':
-          setGameState(prev => ({
-            ...prev,
-            teamScore: message.payload.finalTeamScore, // 最終スコアをセット
-            isGameFinished: true,
-          }));
+        case 'skipRequested':
+          setGameState(message.payload);
+          break;
+        default:
+          console.warn(`Unknown message type: ${message.type}`);
           break;
       }
     };
@@ -107,7 +77,9 @@ export const useGameWebSocket = (roomId: string, playerId: string) => {
     ws.onerror = (error) => console.error('WebSocket error:', error);
 
     return () => {
-      ws.close();
+      if (webSocketRef.current) {
+        webSocketRef.current.close();
+      }
     };
   }, [roomId, playerId, navigate]);
 
@@ -117,5 +89,5 @@ export const useGameWebSocket = (roomId: string, playerId: string) => {
     }
   };
 
-  return { roomState, gameState, sendMessage };
+  return { gameState, sendMessage };
 };

@@ -1,73 +1,148 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router } from 'react-router-dom';
 import { useGameWebSocket } from '../hooks/useGameWebSocket';
 import { PlayerIdContext } from '../contexts/PlayerIdContext';
 import PopUpB from './Popups/PopUpB';
 import PopUpTR from './Popups/PopUpTR';
 import './TutorialPage.css';
 
-const TutorialPage: React.FC = () => {
-  const { roomId } = useParams<{ roomId: string }>();
+// ヘルパー関数: ゲートの入力値を取得
+const getGateInputValues = (gate, gateValues) => {
+  if (!gate || !gate.inputs || !gateValues) return [];
+  return gate.inputs.map(input => ({
+    name: input,
+    value: gateValues[input]
+  }));
+};
+
+const TutorialPage = () => {
+  const { roomId } = useParams();
   const navigate = useNavigate();
   const myPlayerId = useContext(PlayerIdContext);
 
-  const { gameState, sendMessage } = useGameWebSocket(roomId!, myPlayerId!);
+  const { gameState, sendMessage } = useGameWebSocket(roomId, myPlayerId);
 
-  const [gamePhase, setGamePhase] = useState<'loading' | 'starting' | 'playing'>('loading');
-  const [timer, setTimer] = useState(0);
-  // 修正点: useStateの変数名とセッター関数名を正しく対応させました
   const [isNotePopupOpen, setNotePopupOpen] = useState(false);
-  const [isResultPopupOpen, setResultPopupOpen] = useState(false);
+  const [isScoringPopupOpen, setScoringPopupOpen] = useState(false);
+  const [scoreSummary, setScoreSummary] = useState(null);
+  const [skipRequestedPlayers, setSkipRequestedPlayers] = useState([]);
+  const [showSkipButton, setShowSkipButton] = useState(false);
+  const [roundScores, setRoundScores] = useState({ gate: 0, final: 0, bonus: 0 });
+
+  const inputLogIndex = useRef(0);
+  const animationTimeout = useRef(null);
+
+  const myGateAssignments = gameState?.playerGateAssignments?.[myPlayerId] || [];
+  const myCurrentGateId = myGateAssignments.find(gateId => gameState?.gateValues?.[gateId] === null);
+  const myCurrentGate = myCurrentGateId ? gameState?.currentQuestion?.circuit?.gates.find(g => g.id === myCurrentGateId) : null;
+  const myGateInputs = myCurrentGate ? getGateInputValues(myCurrentGate, gameState?.gateValues) : [];
+  const isMyTurn = !!myCurrentGate;
 
   useEffect(() => {
-    if (gameState.currentQuestion) {
-      const loadingTimeout = setTimeout(() => { setGamePhase('starting'); }, 2000);
-      const startingTimeout = setTimeout(() => { setGamePhase('playing'); }, 3000);
-      return () => {
-        clearTimeout(loadingTimeout);
-        clearTimeout(startingTimeout);
-      };
+    // スコアリングフェーズへの移行を検知
+    if (gameState?.status === 'scoring' && gameState.payload?.scoreSummary) {
+      setScoreSummary(gameState.payload.scoreSummary);
+      setScoringPopupOpen(true);
+      animateTimeline(gameState.payload.playerInputLog);
+      setShowSkipButton(true);
+    } else if (gameState?.status !== 'scoring') {
+      // スコアリング以外の状態に切り替わった場合、ポップアップを閉じる
+      setScoringPopupOpen(false);
+      setScoreSummary(null);
+      setShowSkipButton(false);
     }
-  }, [gameState.currentQuestion]);
+  }, [gameState?.status, gameState?.payload]);
 
-  useEffect(() => {
-    let intervalId: ReturnType<typeof setInterval>;
-    if (gamePhase === 'playing' && !gameState.isGameFinished) {
-      intervalId = setInterval(() => { setTimer(prevTimer => prevTimer + 1); }, 1000);
+  const animateTimeline = (log) => {
+    if (inputLogIndex.current >= log.length) {
+      if (animationTimeout.current) clearTimeout(animationTimeout.current);
+      setTimeout(() => {
+        setRoundScores(prev => ({...prev, total: scoreSummary.totalScore}));
+        setScoringPopupOpen(false);
+      }, 1500);
+      return;
     }
-    return () => clearInterval(intervalId);
-  }, [gamePhase, gameState.isGameFinished]);
 
-  useEffect(() => {
-    if (gameState.isGameFinished) {
-      setResultPopupOpen(true); // 修正点: 正しいセッター関数を使用
-    }
-  }, [gameState.isGameFinished]);
+    const currentLog = log[inputLogIndex.current];
+    setRoundScores(prev => ({
+        ...prev,
+        gate: prev.gate + (currentLog.isCorrect ? 10 : 0)
+    }));
 
-  const isMyTurn = gameState.currentPlayerId === myPlayerId;
-  //const currentPlayer = gameState.players.find(p => p.id === gameState.currentPlayerId);
-  const totalSteps = (gameState.currentQuestion?.circuit.length ?? 0) + 1; // 入力段も含む
-  const currentStepIndex = gameState.players.findIndex(p => p.id === gameState.currentPlayerId);
-  const currentGate = currentStepIndex > 0 ? gameState.currentQuestion?.circuit[currentStepIndex - 1] : null;
+    inputLogIndex.current++;
+    animationTimeout.current = setTimeout(() => {
+      animateTimeline(log);
+    }, 1000); // 1秒間隔でアニメーション
+  };
 
-  const handleInput = (value: boolean) => {
+  const handleSkipTimeline = () => {
+    sendMessage('skipTimeline', { roomId, playerId: myPlayerId });
+    if (animationTimeout.current) clearTimeout(animationTimeout.current);
+    const remainingLogs = gameState?.payload?.playerInputLog?.slice(inputLogIndex.current) || [];
+    const finalGateScore = remainingLogs.reduce((acc, log) => acc + (log.isCorrect ? 10 : 0), roundScores.gate);
+    setRoundScores({
+      gate: finalGateScore,
+      final: scoreSummary?.finalOutputScore,
+      bonus: scoreSummary?.bonusScore,
+      total: scoreSummary?.totalScore
+    });
+    setTimeout(() => setScoringPopupOpen(false), 1500);
+  };
+  
+  const handleInput = (value) => {
     if (!isMyTurn) return;
-    sendMessage('playerInput', { roomId, playerId: myPlayerId, inputValue: value });
+    sendMessage('playerInput', { roomId, playerId: myPlayerId, gateId: myCurrentGateId, inputValue: value });
   };
-  const handleCloseResultPopup = () => {
-    setResultPopupOpen(false); // ✨ 修正点: 正しいセッター関数を使用
-    navigate(`/game/${roomId}`);
-  };
+  
+  useEffect(() => {
+    if (!gameState) return;
+    switch (gameState.type) {
+      case 'gameStart':
+      case 'gameStateUpdate':
+      case 'nextRound':
+      case 'gameEnd':
+        setScoreSummary(null);
+        setSkipRequestedPlayers([]);
+        setScoringPopupOpen(false);
+        break;
+      case 'roundComplete':
+        setScoreSummary(gameState.payload?.scoreSummary);
+        break;
+      case 'skipRequested':
+        setSkipRequestedPlayers(gameState.payload?.players);
+        break;
+      default:
+        // 未知のイベントタイプを無視
+        break;
+    }
+  }, [gameState]);
 
-
-  if (!gameState.currentQuestion) {
+  if (!gameState || !gameState.currentQuestion || !gameState.playerGateAssignments) {
     return <div>ゲームを準備中...</div>;
   }
+  
+  const circuitGates = gameState.currentQuestion.circuit.gates;
 
   return (
     <div className="game-container">
-      {isNotePopupOpen && <PopUpB onClose={() => setNotePopupOpen(false)} />} {/* ✨ 修正点: 正しいセッター関数を使用 */}
-      {isResultPopupOpen && <PopUpTR score={gameState.teamScore} onClose={handleCloseResultPopup} />}
+      {isNotePopupOpen && <PopUpB onClose={() => setNotePopupOpen(false)} />}
+      {isScoringPopupOpen && scoreSummary && (
+        <PopUpTR score={scoreSummary.totalScore} onClose={() => setScoringPopupOpen(false)} title="結果発表" >
+          <div>
+            <h3>スコア詳細</h3>
+            <p>ゲート正解スコア: {scoreSummary.gateCorrectScore}</p>
+            <p>最終出力スコア: {scoreSummary.finalOutputScore}</p>
+            <p>ボーナススコア: {scoreSummary.bonusScore}</p>
+          </div>
+          {showSkipButton && <button onClick={handleSkipTimeline}>スキップ</button>}
+          <div className="skip-players">
+            {skipRequestedPlayers.map(p => (
+              <span key={p.playerId}>{p.playerOrder}P</span>
+            ))}
+          </div>
+        </PopUpTR>
+      )}
 
       <header className="game-header">
         <div className="header-left">
@@ -75,61 +150,63 @@ const TutorialPage: React.FC = () => {
           <span>{gameState.roundCount + 1}問目</span>
         </div>
         <div className="header-right">
-          <button onClick={() => setNotePopupOpen(true)}>ノート</button> {/* ✨ 修正点: 正しいセッター関数を使用 */}
+          <button onClick={() => setNotePopupOpen(true)}>ノート</button>
         </div>
       </header>
 
-      <div className="status-bar">
-        {gamePhase === 'loading' && <p className="status-text">通信中…</p>}
-        {gamePhase === 'starting' && <p className="status-text start-text">スタート！</p>}
-        {gamePhase === 'playing' && <p className="status-text timer">{`経過時間: ${timer}秒`}</p>}
-      </div>
-
       <main className="game-main">
-        <section className="progress-indicator">
-          <h3>回路の進捗</h3>
-          <div className="boxes">
-            {[...Array(totalSteps)].map((_, index) => (
-              <div key={index} className={`box ${index === currentStepIndex ? 'active' : ''}`}></div>
+        <section className="circuit-display">
+          <h3>担当ゲート</h3>
+          <div className="my-gates-container">
+            {myGateAssignments.map(gateId => {
+              const gate = circuitGates.find(g => g.id === gateId);
+              if (!gate) return null;
+              const isResolved = gameState.gateValues?.[gateId] !== null;
+              const inputValues = getGateInputValues(gate, gameState.gateValues);
+              return (
+                <div key={gateId} className={`gate-card ${isResolved ? 'resolved' : ''} ${myCurrentGateId === gateId ? 'active' : ''}`}>
+                  <h4>{gate.type} ゲート</h4>
+                  <div className="inputs">
+                    {inputValues.map((input, index) => (
+                      <span key={index}>{input.name}: {input.value === null ? '?' : input.value.toString()}</span>
+                    ))}
+                  </div>
+                  <div className="gate-output">
+                    <span>出力: {isResolved ? gameState.gateValues[gateId].toString() : '?'}</span>
+                  </div>
+                  {myCurrentGateId === gateId && (
+                    <div className="input-controls">
+                      <button onClick={() => handleInput(true)} disabled={!isMyTurn}>T</button>
+                      <button onClick={() => handleInput(false)} disabled={!isMyTurn}>F</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <aside className="game-sidebar">
+          <h3>チームスコア</h3>
+          <p className="score">{gameState.teamScore}点</p>
+          <h3>プレイヤー</h3>
+          <ul className="player-list">
+            {gameState.players.map(player => (
+              <li key={player.playerId} className={player.playerId === myPlayerId ? 'my-player' : ''}>
+                {player.playerOrder}P
+              </li>
             ))}
-          </div>
-        </section>
-
-        <section className="gate-display">
-          {currentGate ? (
-            <>
-              <h4>{currentStepIndex}段目: {currentGate} ゲート</h4>
-              <div className="gate-diagram">
-                <span>入力</span> → <span className="gate-box">{currentGate}</span> → <span>出力</span>
-              </div>
-            </>
-          ) : (
-            <h4>最初の入力</h4>
-          )}
-          
-          <div className="input-controls">
-            <button onClick={() => handleInput(true)} disabled={!isMyTurn}>T</button>
-            <button onClick={() => handleInput(false)} disabled={!isMyTurn}>F</button>
-          </div>
-          {!isMyTurn && <p className="wait-message">他のプレイヤーの入力を待っています...</p>}
-        </section>
+          </ul>
+        </aside>
       </main>
-
-      <aside className="game-sidebar">
-        <h3>チームスコア</h3>
-        <p className="score">{gameState.teamScore}点</p>
-        <h3>プレイヤー</h3>
-        <ul className="player-list">
-          {gameState.players.map(player => (
-            <li key={player.id} className={player.id === gameState.currentPlayerId ? 'current-turn' : ''}>
-              {player.playerOrder}P
-            </li>
-          ))}
-        </ul>
-      </aside>
     </div>
   );
 };
 
-export default TutorialPage;
+const App = () => (
+  <Router>
+    <TutorialPage />
+  </Router>
+);
 
+export default App;

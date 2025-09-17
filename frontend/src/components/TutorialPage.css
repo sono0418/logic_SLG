@@ -116,46 +116,75 @@
 }
 
 /* --- ゲート表示と入力 --- */
-.gate-display {
-  text-align: center;
-}
-
-.gate-diagram {
+.circuit-display {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
   gap: 1rem;
-  font-size: 1.2rem;
-  margin: 1rem 0;
 }
 
-.gate-box {
-  background-color: #3a3f47;
-  padding: 1rem 2rem;
-  border-radius: 5px;
-  border: 1px solid #4a4f57;
-  font-weight: bold;
-  font-size: 1.5rem;
-}
-
-.input-controls .buttons {
+.my-gates-container {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 1rem;
+  gap: 1.5rem;
+}
+
+.gate-card {
+  background-color: #fff;
+  color: #470000;
+  padding: 1.5rem;
+  border-radius: 10px;
+  border: 2px solid #ddd;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  transition: all 0.3s ease-in-out;
+  text-align: center;
+  width: 200px;
+}
+
+.gate-card.resolved {
+  background-color: #e0f7e0;
+  border-color: #4CAF50;
+}
+
+.gate-card.active {
+  border-color: #00ff9b;
+  box-shadow: 0 0 10px rgba(0, 255, 155, 0.5);
+}
+
+.gate-card h4 {
+  margin-top: 0;
+  font-size: 1.25rem;
+}
+
+.gate-card .inputs span {
+  font-size: 1rem;
+  margin: 0 5px;
+  font-weight: bold;
+}
+
+.gate-card .gate-output {
+  margin-top: 1rem;
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+.input-controls {
   margin-top: 1rem;
 }
 
 .input-controls button {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: bold;
-  width: 100px;
-  height: 100px;
+  width: 60px;
+  height: 60px;
   border: 2px solid #00ff9b;
   background-color: transparent;
   color: #00ff9b;
   border-radius: 50%; /* 丸いボタン */
   cursor: pointer;
   transition: all 0.2s;
+  margin: 0 5px;
 }
 
 .input-controls button:hover:not(:disabled) {
@@ -188,15 +217,16 @@
   border-radius: 5px;
   font-weight: 500;
   transition: all 0.2s;
+  color: white;
 }
 
-.player-list li.current-turn {
+.player-list li.my-player {
   background-color: #00ff9b;
   color: #1a1d21;
-  transform: scale(1.05); /* 現在のターンを少し大きく */
+  font-weight: bold;
 }
 
-/* --- ゲーム終了画面 --- */
+/* --- Game end screen --- */
 .game-finished {
   display: flex;
   flex-direction: column;
@@ -218,19 +248,7 @@
 }
 .game-finished button:hover { transform: scale(1.05); }
 
-/* --- アニメーション --- */
-@keyframes fadeInZoom {
-  from {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* --- ポップアップの基本スタイル（共通） --- */
+/* --- Popup base style (common) --- */
 .popup-overlay {
   position: fixed;
   top: 0;
@@ -251,4 +269,5 @@
   border: 1px solid #3a3f47;
   min-width: 300px;
   text-align: center;
+  color: white;
 }
