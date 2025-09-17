@@ -33,26 +33,43 @@ const TutorialPage = () => {
   const inputLogIndex = useRef(0);
   const animationTimeout = useRef(null);
 
-  const myGateAssignments = gameState?.playerGateAssignments?.[myPlayerId] || [];
+  const myGateAssignments = (myPlayerId && gameState?.playerGateAssignments?.[myPlayerId]) || [];
   const myCurrentGateId = myGateAssignments.find(gateId => gameState?.gateValues?.[gateId] === null);
   const myCurrentGate = myCurrentGateId ? gameState?.currentQuestion?.circuit?.gates.find(g => g.id === myCurrentGateId) : null;
-  const myGateInputs = myCurrentGate ? getGateInputValues(myCurrentGate, gameState?.gateValues) : [];
   const isMyTurn = !!myCurrentGate;
 
   useEffect(() => {
-    // スコアリングフェーズへの移行を検知
-    if (gameState?.status === 'scoring' && gameState.payload?.scoreSummary) {
-      setScoreSummary(gameState.payload.scoreSummary);
-      setScoringPopupOpen(true);
-      animateTimeline(gameState.payload.playerInputLog);
-      setShowSkipButton(true);
-    } else if (gameState?.status !== 'scoring') {
-      // スコアリング以外の状態に切り替わった場合、ポップアップを閉じる
-      setScoringPopupOpen(false);
-      setScoreSummary(null);
-      setShowSkipButton(false);
+    // WebSocketからのメッセージを適切にハンドリング
+    if (!gameState) return;
+    
+    switch (gameState.type) {
+      case 'gameStart':
+      case 'gameStateUpdate':
+      case 'nextRound':
+      case 'gameEnd':
+        // ゲームの状態が更新されたらスコアリングポップアップを閉じる
+        setScoringPopupOpen(false);
+        setScoreSummary(null);
+        setSkipRequestedPlayers([]);
+        break;
+
+      case 'roundComplete':
+        // roundCompleteイベントのpayloadを正しく処理
+        setScoreSummary(gameState.payload?.scoreSummary);
+        setScoringPopupOpen(true);
+        animateTimeline(gameState.payload?.playerInputLog);
+        setShowSkipButton(true);
+        break;
+
+      case 'skipRequested':
+        setSkipRequestedPlayers(gameState.payload?.players);
+        break;
+
+      default:
+        // 未知のイベントタイプを無視
+        break;
     }
-  }, [gameState?.status, gameState?.payload]);
+  }, [gameState]);
 
   const animateTimeline = (log) => {
     if (inputLogIndex.current >= log.length) {
@@ -60,7 +77,6 @@ const TutorialPage = () => {
       setTimeout(() => {
         setRoundScores(prev => ({...prev, total: scoreSummary.totalScore}));
         setScoringPopupOpen(false);
-        // 次のラウンドへの移行はバックエンドのnextRoundイベントで処理される
       }, 1500);
       return;
     }
@@ -96,29 +112,6 @@ const TutorialPage = () => {
     sendMessage('playerInput', { roomId, playerId: myPlayerId, gateId: myCurrentGateId, inputValue: value });
   };
   
-  useEffect(() => {
-    if (!gameState) return;
-    switch (gameState.type) {
-      case 'gameStart':
-      case 'gameStateUpdate':
-      case 'nextRound':
-      case 'gameEnd':
-        setScoreSummary(null);
-        setSkipRequestedPlayers([]);
-        setScoringPopupOpen(false);
-        break;
-      case 'roundComplete':
-        setScoreSummary(gameState.payload?.scoreSummary);
-        break;
-      case 'skipRequested':
-        setSkipRequestedPlayers(gameState.payload?.players);
-        break;
-      default:
-        // 未知のイベントタイプを無視
-        break;
-    }
-  }, [gameState]);
-
   if (!gameState || !gameState.currentQuestion || !gameState.playerGateAssignments) {
     return <div>ゲームを準備中...</div>;
   }
@@ -154,6 +147,12 @@ const TutorialPage = () => {
           <button onClick={() => setNotePopupOpen(true)}>ノート</button>
         </div>
       </header>
+
+      <div className="status-bar">
+        {gameState.status === 'inProgress' && <p className="status-text">ゲーム中…</p>}
+        {gameState.status === 'scoring' && <p className="status-text">採点中…</p>}
+        {gameState.status === 'ended' && <p className="status-text">ゲーム終了</p>}
+      </div>
 
       <main className="game-main">
         <section className="circuit-display">
