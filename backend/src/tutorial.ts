@@ -1,7 +1,7 @@
 // src/tutorial.ts
 //チュートリアル用の問題をエクスポートする
-import { tutorialProblems } from './problems';
+import { halfAdderProblems } from './problems';
 
 // tutorialCircuitsは、problems.tsからフィルタリングされたチュートリアル問題のリスト
-export const tutorialCircuits = tutorialProblems.filter(problem => problem.isTutorial);
+export const tutorialCircuits = halfAdderProblems.filter(problem => problem.isTutorial);
 
