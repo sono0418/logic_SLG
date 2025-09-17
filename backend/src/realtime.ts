@@ -1,272 +1,250 @@
 // src/realtime.ts
-
 import { WebSocketServer, WebSocket } from "ws";
-import { handleTutorialLogic, tutorialCircuits } from './tutorial';
+import { tutorialProblems, halfAdderCircuit } from './problems';
 
-// GameStateインターフェースとgameRoomsマップをここに定義
+// 問題セットを結合して1つの配列にする
+const allProblems = [...tutorialProblems];
+
 export interface GameState {
   roomId: string;
   players: { playerId: string, ws: WebSocket, playerOrder: number }[];
-  currentPlayerId: string | null;
   roundCount: number;
   teamScore: number;
+  status: 'waiting' | 'inProgress' | 'ended' | 'scoring';
+  hostId: string | null;
+
   currentQuestion: {
-    circuit: string[];
-    expectedOutput: boolean | { C: boolean; S: boolean; };
+    circuit: typeof halfAdderCircuit;
+    inputAssignments: { [key: string]: boolean };
+    expectedOutput: { C: boolean; S: boolean; };
     isTutorial?: boolean;
   };
-  currentPlayerIndex: number;
-  playerInputs: (boolean | null)[];
-  status: 'waiting' | 'inProgress' | 'ended';
-  playerChoices: { [playerId: string]: string };
-  hostId: string | null;
+
+  gateValues: { [key: string]: boolean | null };
+  playerInputLog: {
+    playerId: string;
+    gateId: string;
+    inputValue: boolean;
+    isCorrect: boolean;
+    timestamp: number;
+  }[];
+
+  playerGateAssignments: { [playerId: string]: string[] };
 }
 export const gameRooms = new Map<string, GameState>();
 
-// generateNewQuestion関数もここに移動
+interface WebSocketWithIdentity extends WebSocket {
+  roomId?: string;
+  playerId?: string;
+}
+
+function evaluateGate(gateType: string, inputs: (boolean | null)[]): boolean | null {
+  if (inputs.includes(null)) return null;
+  switch (gateType) {
+    case 'AND':
+      return inputs.every(input => input);
+    case 'OR':
+      return inputs.some(input => input);
+    case 'NOT':
+      return !inputs[0];
+    default:
+      return null;
+  }
+}
+
 function generateNewQuestion() {
-  const gateTypes = ['AND', 'OR', 'NOT'];
-  const circuitLength = Math.floor(Math.random() * 2) + 2;
-  const circuit = [];
-  for (let i = 0; i < circuitLength; i++) {
-    circuit.push(gateTypes[Math.floor(Math.random() * gateTypes.length)]);
+  const selectedProblem = allProblems[Math.floor(Math.random() * allProblems.length)];
+  return { ...selectedProblem, isTutorial: false }; // 本番用としてisTutorialをfalseに上書き
+}
+
+function assignGatesToPlayers(players: any[], gates: any[]) {
+  const assignments: { [playerId: string]: string[] } = {};
+  players.forEach(p => assignments[p.playerId] = []);
+  const sortedGates = [...gates].sort((a, b) => a.stage - b.stage);
+  let playerIndex = 0;
+  for (const gate of sortedGates) {
+    assignments[players[playerIndex].playerId].push(gate.id);
+    playerIndex = (playerIndex + 1) % players.length;
   }
-  const initialInput = Math.random() < 0.5;
-  let expectedOutput = initialInput;
-  for (let i = 0; i < circuit.length; i++) {
-    const gateType = circuit[i];
-    if (gateType === 'AND') {
-      expectedOutput = expectedOutput && (Math.random() < 0.5);
-    } else if (gateType === 'OR') {
-      expectedOutput = expectedOutput || (Math.random() < 0.5);
-    } else if (gateType === 'NOT') {
-      expectedOutput = !expectedOutput;
-    }
+  return assignments;
+}
+
+function scoreAndAdvanceRound(room: GameState) {
+  let gateCorrectScore = 0;
+  const gateScorePerCorrect = 10;
+  const correctGateIds = room.playerInputLog
+      .filter(log => log.isCorrect)
+      .map(log => log.gateId);
+  gateCorrectScore = correctGateIds.length * gateScorePerCorrect;
+  let finalOutputScore = 0;
+  const finalGateIdC = room.currentQuestion.circuit.outputs.C;
+  const finalGateIdS = room.currentQuestion.circuit.outputs.S;
+  const finalOutputC = room.gateValues[finalGateIdC];
+  const finalOutputS = room.gateValues[finalGateIdS];
+  const isFinalOutputCorrect = finalOutputC === room.currentQuestion.expectedOutput.C && finalOutputS === room.currentQuestion.expectedOutput.S;
+  if (isFinalOutputCorrect) {
+      finalOutputScore = 50;
   }
-  return { circuit, expectedOutput };
+  let bonusScore = 0;
+  const allGatesPerfect = room.currentQuestion.circuit.gates.every(gate => {
+      const log = room.playerInputLog.find(l => l.gateId === gate.id);
+      return log && log.isCorrect;
+  });
+  if (allGatesPerfect) {
+      bonusScore = 20;
+  }
+  const roundScore = gateCorrectScore + finalOutputScore + bonusScore;
+  room.teamScore += roundScore;
+  room.players.forEach(p => p.ws.send(JSON.stringify({
+      type: 'roundComplete',
+      payload: {
+          scoreSummary: {
+              gateCorrectScore,
+              finalOutputScore,
+              bonusScore,
+              totalScore: room.teamScore,
+              isFinalOutputCorrect
+          },
+          playerInputLog: room.playerInputLog,
+          currentQuestion: room.currentQuestion,
+          gateValues: room.gateValues
+      }
+  })));
+  room.roundCount++;
+  if (room.roundCount < allProblems.length) {
+      const nextQuestion = allProblems[room.roundCount];
+      room.currentQuestion = nextQuestion;
+      room.playerInputLog = [];
+      room.gateValues = { ...nextQuestion.inputAssignments };
+      nextQuestion.circuit.gates.forEach(gate => {
+          room.gateValues[gate.id] = null;
+      });
+      const shuffledPlayers = [...room.players].sort(() => 0.5 - Math.random());
+      room.players = shuffledPlayers;
+      room.playerGateAssignments = assignGatesToPlayers(room.players, nextQuestion.circuit.gates);
+      room.players.forEach(p => p.ws.send(JSON.stringify({
+          type: 'nextRound',
+          payload: room
+      })));
+  } else {
+      room.status = 'ended';
+      room.players.forEach(p => p.ws.send(JSON.stringify({
+          type: 'gameEnd',
+          payload: { finalTeamScore: room.teamScore }
+      })));
+      gameRooms.delete(room.roomId);
+  }
 }
 
 export function setupWebSocketServer(wss: WebSocketServer) {
   wss.on('connection', ws => {
-    interface WebSocketWithIdentity extends WebSocket {
-      roomId?: string;
-      playerId?: string;
-    }
     const wsWithId = ws as WebSocketWithIdentity;
-
     ws.on('message', message => {
       try {
         const data = JSON.parse(message.toString());
-
         if (data.type === 'joinRoom') {
           const { roomId, playerId } = data.payload;
+          wsWithId.roomId = roomId;
+          wsWithId.playerId = playerId;
           let room = gameRooms.get(roomId);
-
           if (!room) {
+            const initialQuestion = tutorialProblems.find(p => p.isTutorial);
+            if (!initialQuestion) {
+              console.error("No tutorial questions found.");
+              ws.send(JSON.stringify({ type: 'error', payload: 'Tutorial questions not available.' }));
+              return;
+            }
             const newRoom: GameState = {
               roomId,
               players: [],
-              currentQuestion: { circuit: [], expectedOutput: false },
-              currentPlayerIndex: 0,
-              playerInputs: [],
-              status: 'waiting',
-              currentPlayerId: null,
               roundCount: 0,
               teamScore: 0,
-              playerChoices: {},
+              status: 'waiting',
               hostId: playerId,
+              currentQuestion: initialQuestion as any,
+              gateValues: {},
+              playerInputLog: [],
+              playerGateAssignments: {},
             };
             gameRooms.set(roomId, newRoom);
             room = newRoom;
-            console.log(`New room ${roomId} created with status: ${room.status}`);
           }
-          
           const playerOrder = room.players.length + 1;
           room.players.push({ playerId, ws, playerOrder });
-          
-          console.log(`Player ${playerId} joined room ${roomId}`);
           ws.send(JSON.stringify({ type: 'joinSuccess', payload: { roomId, playerId } }));
-          room.players.forEach(p => {
-            p.ws.send(JSON.stringify({ type: 'roomUpdate', payload: room }));
-          });
-        }
+          room.players.forEach(p => p.ws.send(JSON.stringify({ type: 'roomUpdate', payload: room })));
         
-        else if (data.type === 'startGame') {
-          const { roomId, playerId, mode } = data.payload;
+        } else if (data.type === 'startGame') {
+          const { roomId, mode } = data.payload;
           const room = gameRooms.get(roomId);
-
-          if (!room || room.players[0].playerId !== playerId || room.players.length < 2 || room.status === 'inProgress') {
-            return;
-          }
-
+          if (!room || room.players.length < 2 || room.status !== 'waiting') return;
           room.status = 'inProgress';
           room.roundCount = 0;
-          room.currentPlayerIndex = 0;
-          room.currentPlayerId = room.players[0].playerId;
-
-          if (mode === 'tutorial') {
-            room.currentQuestion = tutorialCircuits[0];
-          } else {
-            room.currentQuestion = generateNewQuestion();
-          }
-          room.playerInputs = new Array(room.players.length).fill(null);
-
-          room.players.forEach(p => {
-            p.ws.send(JSON.stringify({ 
-              type: 'gameStart', 
-              payload: { 
-                currentQuestion: room.currentQuestion, 
-                currentPlayerIndex: room.currentPlayerIndex,
-                currentPlayerId: room.currentPlayerId,
-                players: room.players.map(p => ({ id: p.playerId, playerOrder: p.playerOrder })),
-                teamScore: room.teamScore,
-                mode: mode,
-              }
-            }));
-          });
-          console.log(`Game started in room ${roomId}. Status: ${room.status}`);
-        }
-        
-        else if (data.type === 'playerInput') {
-          const { roomId, playerId, inputValue } = data.payload;
-          const room = gameRooms.get(roomId);
-
-          if (!room || room.status !== 'inProgress' || room.currentPlayerId !== playerId) {
-            return;
-          }
-
-          room.playerInputs[room.currentPlayerIndex] = inputValue;
-
-          if (room.currentPlayerIndex === room.players.length - 1) {
-            let currentOutput = room.playerInputs[0] as boolean;
-            for (let i = 1; i < room.playerInputs.length; i++) {
-              const gateType = room.currentQuestion.circuit[i - 1];
-              const nextInput = room.playerInputs[i] as boolean;
-              if (gateType === 'AND') {
-                currentOutput = currentOutput && nextInput;
-              } else if (gateType === 'OR') {
-                currentOutput = currentOutput || nextInput;
-              } else if (gateType === 'NOT') {
-                currentOutput = !currentOutput;
-              }
-            }
-            const isCorrect = currentOutput === room.currentQuestion.expectedOutput;
-            if (isCorrect) {
-              room.teamScore += 10;
-            }
-            
-            room.roundCount++;
-
-            if (room.currentQuestion.isTutorial) {
-              if (room.roundCount < tutorialCircuits.length) {
-                room.currentQuestion = tutorialCircuits[room.roundCount];
-                room.currentPlayerIndex = 0;
-                room.currentPlayerId = room.players[0].playerId;
-                room.playerInputs = new Array(room.players.length).fill(null);
-
-                room.players.forEach(p => {
-                  p.ws.send(JSON.stringify({
-                    type: 'nextRound',
-                    payload: {
-                      roundCount: room.roundCount,
-                      currentQuestion: room.currentQuestion,
-                      updatedTeamScore: room.teamScore,
-                    }
-                  }));
-                });
-              } else {
-                room.status = 'ended';
-                room.players.forEach(p => {
-                  p.ws.send(JSON.stringify({
-                    type: 'gameEnd',
-                    payload: { message: 'Tutorial complete!', finalTeamScore: room.teamScore }
-                  }));
-                });
-                gameRooms.delete(roomId);
-              }
-            } else {
-              if (room.roundCount >= 3) {
-                room.status = 'ended';
-                room.players.forEach(p => {
-                  p.ws.send(JSON.stringify({
-                    type: 'gameEnd',
-                    payload: {
-                      isCorrect,
-                      finalOutput: currentOutput,
-                      expectedOutput: room.currentQuestion.expectedOutput,
-                      finalTeamScore: room.teamScore,
-                    }
-                  }));
-                });
-                gameRooms.delete(roomId);
-              } else {
-                const newQuestion = generateNewQuestion();
-                room.currentQuestion = newQuestion;
-                room.currentPlayerIndex = 0;
-                room.currentPlayerId = room.players[0].playerId;
-                room.playerInputs = new Array(room.players.length).fill(null);
-    
-                room.players.forEach(p => {
-                  p.ws.send(JSON.stringify({
-                    type: 'nextRound',
-                    payload: {
-                      roundCount: room.roundCount,
-                      currentQuestion: room.currentQuestion,
-                      updatedTeamScore: room.teamScore,
-                    }
-                  }));
-                });
-              }
-            }
-
-          } else {
-            room.currentPlayerIndex++;
-            room.currentPlayerId = room.players[room.currentPlayerIndex].playerId;
-
-            room.players.forEach(p => {
-              p.ws.send(JSON.stringify({
-                type: 'turnUpdate',
-                payload: {
-                  currentPlayerId: room.currentPlayerId,
-                  lastInput: inputValue,
-                  circuitGateType: room.currentQuestion.circuit[room.currentPlayerIndex - 1]
-                }
-              }));
-            });
-          }
-        }
-        
-        else if (data.type === 'selectGameMode') {
-          const { roomId, playerId, mode } = data.payload;
-          const room = gameRooms.get(roomId);
-
-          if (!room || room.status !== 'waiting' || room.hostId !== playerId) {
-              console.log(`Unauthorized selectGameMode request from player ${playerId} in room ${roomId}.`);
+          const questions = mode === 'tutorial' ? allProblems.filter(p => p.isTutorial) : allProblems;
+          if (questions.length === 0) {
+              console.error(`No questions found for mode: ${mode}`);
               return;
           }
-
-          room.playerChoices[playerId] = mode;
-          
-          room.players.forEach(p => {
-            p.ws.send(JSON.stringify({ 
-              type: 'roomUpdate',
-              payload: { 
-                roomId: room.roomId,
-                players: room.players.map(player => ({ id: player.playerId, playerOrder: player.playerOrder })),
-                playerChoices: room.playerChoices,
-                hostId: room.hostId,
-                teamScore: room.teamScore,
-              }
-            }));
+          const initialQuestion = questions[0];
+          const shuffledPlayers = [...room.players].sort(() => 0.5 - Math.random());
+          room.players = shuffledPlayers;
+          room.playerGateAssignments = assignGatesToPlayers(room.players, initialQuestion.circuit.gates);
+          room.currentQuestion = initialQuestion as any;
+          room.gateValues = { ...initialQuestion.inputAssignments };
+          initialQuestion.circuit.gates.forEach(gate => {
+            room.gateValues[gate.id] = null;
           });
+          room.playerInputLog = [];
+          room.players.forEach(p => p.ws.send(JSON.stringify({ type: 'gameStart', payload: room })));
+        
+        } else if (data.type === 'playerInput') {
+          const { roomId, playerId, gateId, inputValue } = data.payload;
+          const room = gameRooms.get(roomId);
+          if (!room || room.status !== 'inProgress') return;
+          if (!room.playerGateAssignments[playerId].includes(gateId) || room.gateValues[gateId] !== null) return;
+          const currentGate = room.currentQuestion.circuit.gates.find(g => g.id === gateId);
+          if (!currentGate) return;
+          const inputValues = currentGate.inputs.map(input => room.gateValues[input]);
+          const correctOutput = evaluateGate(currentGate.type, inputValues);
+          const isCorrect = correctOutput !== null && inputValue === correctOutput;
+          room.playerInputLog.push({
+            playerId,
+            gateId,
+            inputValue,
+            isCorrect,
+            timestamp: Date.now()
+          });
+          if (isCorrect) {
+            room.gateValues[gateId] = inputValue;
+          }
+          room.players.forEach(p => p.ws.send(JSON.stringify({ type: 'gameStateUpdate', payload: room })));
+          const allGatesCompleted = room.currentQuestion.circuit.gates.every(gate => room.gateValues[gate.id] !== null);
+          if (allGatesCompleted) {
+            room.status = 'scoring';
+            scoreAndAdvanceRound(room);
+          }
+        
+        } else if (data.type === 'selectGameMode') {
+          // このイベントはstartGameに統合されたため、ここでは処理しない
+          console.log('selectGameMode event is deprecated.');
         }
       } catch (error) {
-        console.error(error);
+        console.error('WebSocket message error:', error);
       }
     });
 
     ws.on('close', () => {
-      console.log('Client disconnected.');
+      if (wsWithId.roomId && wsWithId.playerId) {
+        const room = gameRooms.get(wsWithId.roomId);
+        if (room) {
+          room.players = room.players.filter(p => p.playerId !== wsWithId.playerId);
+          if (room.players.length === 0) {
+            gameRooms.delete(wsWithId.roomId);
+          } else {
+            room.players.forEach(p => p.ws.send(JSON.stringify({ type: 'roomUpdate', payload: room })));
+          }
+        }
+      }
     });
   });
 }
