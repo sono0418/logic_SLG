@@ -5,7 +5,7 @@ import { useGameWebSocket } from '../hooks/useGameWebSocket';
 import { PlayerIdContext } from '../contexts/PlayerIdContext';
 import PopUpB from './Popups/PopUpB';
 import PopUpTR from './Popups/PopUpTR';
-import './TutorialPage.css';
+import '../styles/TutorialPage.css';
 
 // ヘルパー関数: ゲートの入力値を取得
 const getGateInputValues = (gate, gateValues) => {
@@ -60,6 +60,7 @@ const TutorialPage = () => {
       setTimeout(() => {
         setRoundScores(prev => ({...prev, total: scoreSummary.totalScore}));
         setScoringPopupOpen(false);
+        // 次のラウンドへの移行はバックエンドのnextRoundイベントで処理される
       }, 1500);
       return;
     }
