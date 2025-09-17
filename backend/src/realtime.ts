@@ -137,6 +137,7 @@ function scoreAndAdvanceRound(room: GameState) {
 }
 
 export function setupWebSocketServer(wss: WebSocketServer) {
+  const PORT = process.env.PORT || 10000;
   wss.on('connection', ws => {
     const wsWithId = ws as WebSocketWithIdentity;
     ws.on('message', message => {
