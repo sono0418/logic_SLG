@@ -8,14 +8,14 @@ import PopUpTR from './Popups/PopUpTR';
 import './TutorialPage.css';
 
 // ヘルパー関数: ゲートの入力値を取得
-const getGateInputValues = (gate, gateValues) => {
+const getGateInputValues = (gate: { inputs: string[] } | null, gateValues: { [key: string]: boolean | null }) => {
   if (!gate || !gate.inputs || !gateValues) return [];
   return gate.inputs.map(input => ({
     name: input,
     value: gateValues[input]
   }));
-};
 
+};
 const TutorialPage = () => {
   const { roomId } = useParams();
   const navigate = useNavigate();
