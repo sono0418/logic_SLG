@@ -11,14 +11,14 @@ const GamePage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const myPlayerId = useContext(PlayerIdContext);
   const maxPlayers = 4;
-  const { roomState, sendMessage } = useGameWebSocket(roomId!, myPlayerId);
+  const { gameState, sendMessage } = useGameWebSocket(roomId!, myPlayerId);
   //ポップアップ用の
   const navigate = useNavigate(); //navigate関数を取得
   const [isNotePopupOpen, setNotePopupOpen] = useState(false);
   const [isRankingPopupOpen, setRankingPopupOpen] = useState(false);
 
     // myPlayerIdがまだ読み込めていない場合はローディング表示
-  if (!myPlayerId || !roomState) {
+  if (!myPlayerId || !gameState) {
     return <div>ルーム情報を読み込み中...</div>;
   }
   
@@ -34,7 +34,7 @@ const GamePage: React.FC = () => {
   };
 
   const handleStartGame = () => {
-    const selectedMode = roomState?.playerChoices?.[myPlayerId];
+    const selectedMode = gameState?.playerChoices?.[myPlayerId];
     if (selectedMode) {
       sendMessage('startGame', { roomId, playerId: myPlayerId, mode: selectedMode });
     }
@@ -48,20 +48,20 @@ const GamePage: React.FC = () => {
     }
   } ;
 
-  if (!roomState) {
+  if (!gameState) {
     return <div>ルーム情報を読み込み中...</div>;
   }
   
-  const isHost = roomState.hostId === myPlayerId;
+  const isHost = gameState.hostId === myPlayerId;
   // 修正点 1: playerChoicesが存在するかチェックしてからアクセスする
-  const canStartGame = isHost && !!(roomState.playerChoices && roomState.playerChoices[myPlayerId]);
+  const canStartGame = isHost && !!(gameState.playerChoices && gameState.playerChoices[myPlayerId]);
 
   // 修正点 2: playerChoicesが存在しない場合を考慮する
   const getPlayersForMode = (mode: string) => {
-    if (!roomState.playerChoices) {
+    if (!gameState.playerChoices) {
       return []; // playerChoicesがなければ空の配列を返す
     }
-    return roomState.players.filter(p => roomState.playerChoices[p.id] === mode);
+    return gameState.players.filter(p => gameState.playerChoices[p.id] === mode);
   };
 
 
@@ -69,7 +69,7 @@ const GamePage: React.FC = () => {
     <div className="game-selection-container">
       <header className="page-header">
         <div className="room-id-display">
-          <span>ルームID: {roomState.roomId}</span>
+          <span>ルームID: {gameState.roomId}</span>
           <button onClick={handleCopyRoomId}>コピー</button>
         </div>
       </header>
@@ -77,7 +77,7 @@ const GamePage: React.FC = () => {
         <section className="game-mode-section">
           <div className="mode-options">
             {/* Tutorial Button */}
-            <button onClick={() => handleSelectMode('tutorial')} className={`mode-option ${roomState.playerChoices?.[myPlayerId] === 'tutorial' ? 'my-choice' : ''}`}>
+            <button onClick={() => handleSelectMode('tutorial')} className={`mode-option ${gameState.playerChoices?.[myPlayerId] === 'tutorial' ? 'my-choice' : ''}`}>
               チュートリアル
               <div className="voters">
                 {/* Display only players who chose Tutorial */}
@@ -88,7 +88,7 @@ const GamePage: React.FC = () => {
             </button>
 
             {/* Time Attack Button */}
-            <button onClick={() => handleSelectMode('timeAttack')} className={`mode-option ${roomState.playerChoices?.[myPlayerId] === 'timeAttack' ? 'my-choice' : ''}`}>
+            <button onClick={() => handleSelectMode('timeAttack')} className={`mode-option ${gameState.playerChoices?.[myPlayerId] === 'timeAttack' ? 'my-choice' : ''}`}>
               タイムアタック
               <div className="voters">
                 {/* Display only players who chose Time Attack */}
@@ -99,7 +99,7 @@ const GamePage: React.FC = () => {
             </button>
 
             {/* Circuit Prediction Button */}
-            <button onClick={() => handleSelectMode('circuitPrediction')} className={`mode-option ${roomState.playerChoices?.[myPlayerId] === 'circuitPrediction' ? 'my-choice' : ''}`}>
+            <button onClick={() => handleSelectMode('circuitPrediction')} className={`mode-option ${gameState.playerChoices?.[myPlayerId] === 'circuitPrediction' ? 'my-choice' : ''}`}>
               回路予測
               <div className="voters">
                 {/* Display only players who chose Circuit Prediction */}
@@ -130,7 +130,7 @@ const GamePage: React.FC = () => {
         <section className="player-status-section">
           <div className="player-slots">
             {[...Array(maxPlayers)].map((_, index) => {
-              const player = roomState.players.find(p => p.playerOrder === index + 1);
+              const player = gameState.players.find(p => p.playerOrder === index + 1);
               return (
                 <div key={index} className={`player-slot ${player ? 'active' : 'inactive'}`}>
                   <span className="player-order-label">{index + 1}P</span>

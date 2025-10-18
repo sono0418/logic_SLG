@@ -58,6 +58,9 @@ export const useGameWebSocket = (roomId: string, playerId: string) => {
       console.log('Received message:', message);
 
       switch (message.type) {
+        case 'joinSuccess':
+          console.log(`Successfully joined room ${message.payload.roomId} as player ${message.payload.playerId}`);
+          break;
         case 'roomUpdate':
         case 'gameStart':
         case 'gameStateUpdate':
