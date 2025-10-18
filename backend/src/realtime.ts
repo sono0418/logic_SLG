@@ -1,6 +1,6 @@
 // src/realtime.ts
 import { WebSocketServer, WebSocket } from "ws";
-import { tutorialProblems, halfAdderCircuit } from './problems';
+import { halfAdderProblems, halfAdderCircuit } from './problems';
 
 // --- ヘルパー関数: フロントエンド送信用に ws を除外 ---
 function createSerializableGameState(room: GameState): Omit<GameState, 'players'> & { players: Omit<GameState['players'][number], 'ws'>[] } {
@@ -12,7 +12,7 @@ function createSerializableGameState(room: GameState): Omit<GameState, 'players'
 // --- ここまでヘルパー関数 ---
 
 // 問題セットを結合して1つの配列にする
-const allProblems = [...tutorialProblems];
+const allProblems = [...halfAdderProblems];
 
 // --- 型定義 ---
 export interface GameState {
@@ -195,7 +195,7 @@ export function setupWebSocketServer(wss: WebSocketServer) {
           // 新規ルーム作成
           if (!room) {
             console.log(`New room ${roomId} created with status: waiting`); // ルーム作成ログ
-            const initialQuestion = tutorialProblems.find(p => p.isTutorial); // チュートリアル問題を検索
+            const initialQuestion = halfAdderProblems.find(p => p.isTutorial); // チュートリアル問題を検索
             if (!initialQuestion) {
               console.error("No tutorial questions found.");
               ws.send(JSON.stringify({ type: 'error', payload: 'Tutorial questions not available.' }));
