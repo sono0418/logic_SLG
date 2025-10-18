@@ -20,11 +20,12 @@ const GamePage: React.FC = () => {
 
   // ▼▼▼ ゲーム状態に応じた画面遷移/表示切り替え ▼▼▼
   useEffect(() => {
+    console.log("useEffect running. Current gameState:", gameState);
     console.log(
       "useEffect checking status:", gameState?.status,
       "isTutorial:", gameState?.currentQuestion?.isTutorial
     );
-    
+
     if (gameState?.status === 'inProgress') {
       if (gameState?.status === 'inProgress') {
       // チュートリアルモードかどうかを判定
