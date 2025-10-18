@@ -1,5 +1,5 @@
 // src/components/GamePage.tsx
-import React, { useState, useContext } from 'react'; 
+import React, { useState, useContext, useEffect } from 'react'; 
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGameWebSocket } from '../hooks/useGameWebSocket';
 import { PlayerIdContext } from '../contexts/PlayerIdContext'; 
@@ -20,6 +20,11 @@ const GamePage: React.FC = () => {
 
   // ▼▼▼ ゲーム状態に応じた画面遷移/表示切り替え ▼▼▼
   useEffect(() => {
+    console.log(
+      "useEffect checking status:", gameState?.status,
+      "isTutorial:", gameState?.currentQuestion?.isTutorial
+    );
+    
     if (gameState?.status === 'inProgress') {
       if (gameState?.status === 'inProgress') {
       // チュートリアルモードかどうかを判定
