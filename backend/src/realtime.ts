@@ -153,12 +153,15 @@ function scoreAndAdvanceRound(room: GameState) {
       room.playerGateAssignments = assignGatesToPlayers(room.players, nextQuestion.circuit.gates);
       room.status = 'inProgress'; // scoring から inProgress に戻す
 
-      // nextRound メッセージを送信 (シリアライズ必須)
+      // === nextRound の修正箇所 ===
+      // nextRound メッセージを送信 (シリアライズ必須、1回だけ！)
       const serializableNextRoundState = createSerializableGameState(room);
       room.players.forEach(p => p.ws.send(JSON.stringify({
           type: 'nextRound',
-          payload: serializableNextRoundState
+          payload: serializableNextRoundState // シリアライズしたものを送る
       })));
+      // === ここまで修正 ===
+
   } else {
       // ゲーム終了
       room.status = 'ended';
@@ -226,13 +229,17 @@ export function setupWebSocketServer(wss: WebSocketServer) {
              room.players = room.players.map(p => p.playerId === playerId ? { ...p, ws: wsWithId } : p);
           }
 
-
           // joinSuccess を送信 (シリアライズ不要)
           ws.send(JSON.stringify({ type: 'joinSuccess', payload: { roomId, playerId } }));
 
-          // roomUpdate を送信 (シリアライズ必須)
+          // === roomUpdate の修正箇所 ===
+          // roomUpdate を送信 (シリアライズ必須、1回だけ！)
           const serializableRoomState = createSerializableGameState(room);
-          room.players.forEach(p => p.ws.send(JSON.stringify({ type: 'roomUpdate', payload: serializableRoomState })));
+          room.players.forEach(p => p.ws.send(JSON.stringify({
+              type: 'roomUpdate', // タイプを roomUpdate に
+              payload: serializableRoomState // シリアライズしたものを送る
+          })));
+          // === ここまで修正 ===
 
         // --- startGame 処理 ---
         } else if (data.type === 'startGame') {
@@ -245,7 +252,8 @@ export function setupWebSocketServer(wss: WebSocketServer) {
           if (room.hostId !== wsWithId.playerId) { // ホストのみ開始可能
              console.warn(`startGame: Player ${wsWithId.playerId} is not the host of room ${roomId}.`); return;
           }
-          if (room.players.length < 2) { // プレイヤー人数チェック (チュートリアルでも2人必要か？ 仕様による)
+          // プレイヤー人数チェック (チュートリアルでも2人必要か？ 仕様による -> 2人必要と仮定)
+          if (room.players.length < 2) {
              console.warn(`startGame: Not enough players in room ${roomId}. Need at least 2.`);
              ws.send(JSON.stringify({ type: 'error', payload: 'プレイヤーが2人以上必要です。' })); // フロントにエラー通知
              return;
@@ -284,10 +292,15 @@ export function setupWebSocketServer(wss: WebSocketServer) {
 
           console.log(`Game started in room ${roomId}. Status: inProgress`); // 開始ログ
 
-          // gameStart を送信 (シリアライズ必須)
+          // === gameStart の修正箇所 ===
+          // gameStart を送信 (シリアライズ必須、1回だけ！)
           const serializableGameState = createSerializableGameState(room);
           console.log("Sending gameStart with serializable payload:", serializableGameState); // 送信ログ
-          room.players.forEach(p => p.ws.send(JSON.stringify({ type: 'gameStart', payload: serializableGameState })));
+          room.players.forEach(p => p.ws.send(JSON.stringify({
+              type: 'gameStart',
+              payload: serializableGameState // シリアライズしたものを送る
+          })));
+          // === ここまで修正 ===
 
         // --- playerInput 処理 ---
         } else if (data.type === 'playerInput') {
@@ -299,12 +312,18 @@ export function setupWebSocketServer(wss: WebSocketServer) {
             console.warn(`playerInput denied: Room ${roomId} not found or not in progress.`); return;
           }
           const playerAssignments = room.playerGateAssignments[playerId];
+          // 担当外のゲート、または既に解決済みのゲートへの入力を弾く
           if (!playerAssignments || !playerAssignments.includes(gateId)) {
             console.warn(`playerInput denied: Gate ${gateId} not assigned to player ${playerId}.`); return;
           }
+          // 既に値が入っている場合は入力を無視（もしくはエラーを返す）
           if (room.gateValues[gateId] !== null) {
-            console.warn(`playerInput denied: Gate ${gateId} already resolved.`); return;
+            console.warn(`playerInput denied: Gate ${gateId} already resolved.`);
+            // 必要ならフロントにエラーメッセージを送る
+            // ws.send(JSON.stringify({ type: 'error', payload: `ゲート ${gateId} は解決済みです。` }));
+            return;
           }
+
 
           const currentGate = room.currentQuestion.circuit.gates.find(g => g.id === gateId);
           if (!currentGate) {
@@ -332,12 +351,17 @@ export function setupWebSocketServer(wss: WebSocketServer) {
             console.log(`Player ${playerId} correctly resolved gate ${gateId} with ${inputValue}`); // 正解ログ
           } else {
              console.log(`Player ${playerId} incorrectly resolved gate ${gateId} with ${inputValue}`); // 不正解ログ
+             // 不正解の場合のペナルティなどをここに追加可能
           }
 
-
-          // gameStateUpdate を送信 (シリアライズ必須)
+          // === gameStateUpdate の修正箇所 ===
+          // gameStateUpdate を送信 (シリアライズ必須、1回だけ！)
           const serializableUpdateState = createSerializableGameState(room);
-          room.players.forEach(p => p.ws.send(JSON.stringify({ type: 'gameStateUpdate', payload: serializableUpdateState })));
+          room.players.forEach(p => p.ws.send(JSON.stringify({
+              type: 'gameStateUpdate',
+              payload: serializableUpdateState // シリアライズしたものを送る
+          })));
+          // === ここまで修正 ===
 
           // 全ゲート完了チェック
           const allGatesCompleted = room.currentQuestion.circuit.gates.every(gate => room.gateValues[gate.id] !== null);
