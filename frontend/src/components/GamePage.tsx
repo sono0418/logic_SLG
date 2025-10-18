@@ -6,18 +6,40 @@ import { PlayerIdContext } from '../contexts/PlayerIdContext';
 import PopUpB from './Popups/PopUpB';
 import PopUpC from './Popups/PopUpC';
 import './GamePage.css';
+import GameComponent from './GameComponent';
+import TutorialPage from './TutorialPage';
 
 const GamePage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const myPlayerId = useContext(PlayerIdContext);
   const maxPlayers = 4;
   const { gameState, sendMessage } = useGameWebSocket(roomId!, myPlayerId);
-  //ポップアップ用の
   const navigate = useNavigate(); //navigate関数を取得
   const [isNotePopupOpen, setNotePopupOpen] = useState(false);
   const [isRankingPopupOpen, setRankingPopupOpen] = useState(false);
 
-    // myPlayerIdがまだ読み込めていない場合はローディング表示
+  // ▼▼▼ ゲーム状態に応じた画面遷移/表示切り替え ▼▼▼
+  useEffect(() => {
+    if (gameState?.status === 'inProgress') {
+      if (gameState?.status === 'inProgress') {
+      // チュートリアルモードかどうかを判定
+      if (gameState.currentQuestion?.isTutorial) {
+        console.log("Navigating to Tutorial Page...");
+        navigate(`/play/tutorial/${roomId}`);
+      } else {
+        // モードを追加する場合の分岐
+        console.log("Navigating to Standard Game Page (Not Implemented Yet)...");
+        // navigate(`/play/standard/${roomId}`); // 例: 通常ゲーム用のルート
+      }
+    }
+    } else if (gameState?.status === 'ended') {
+      // ゲーム終了時の処理 (例: 結果画面へ遷移)
+      // navigate(`/results/${roomId}`);
+      console.log("Game ended!"); // とりあえずログ出力
+    }
+  }, [gameState?.status, navigate, roomId, gameState?.currentQuestion?.isTutorial]); // gameState.status と gameState.currentQuestion?.isTutorial を依存配列に追加
+
+  // ローディング表示
   if (!myPlayerId || !gameState) {
     return <div>ルーム情報を読み込み中...</div>;
   }
@@ -27,9 +49,9 @@ const GamePage: React.FC = () => {
     sendMessage('selectGameMode', { roomId, playerId: myPlayerId, mode });
   };
 
+  //トップページに遷移
   const handleExitRoom = () => {
     sendMessage('exitRoom', { roomId: roomId!, playerId: myPlayerId });
-    // トップページに遷移
     navigate('/');
   };
 
@@ -48,22 +70,15 @@ const GamePage: React.FC = () => {
     }
   } ;
 
-  if (!gameState) {
-    return <div>ルーム情報を読み込み中...</div>;
-  }
-  
+  // ▼▼▼ ゲーム状態に応じたレンダリング ▼▼▼
   const isHost = gameState.hostId === myPlayerId;
-  // 修正点 1: playerChoicesが存在するかチェックしてからアクセスする
   const canStartGame = isHost && !!(gameState.playerChoices && gameState.playerChoices[myPlayerId]);
-
-  // 修正点 2: playerChoicesが存在しない場合を考慮する
   const getPlayersForMode = (mode: string) => {
     if (!gameState.playerChoices) {
       return []; // playerChoicesがなければ空の配列を返す
     }
     return gameState.players.filter(p => gameState.playerChoices[p.id] === mode);
   };
-
 
   return (
     <div className="game-selection-container">

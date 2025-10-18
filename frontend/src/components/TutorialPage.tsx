@@ -203,10 +203,4 @@ const TutorialPage = () => {
   );
 };
 
-const App = () => (
-  <Router>
-    <TutorialPage />
-  </Router>
-);
-
-export default App;
+export default TutorialPage;
