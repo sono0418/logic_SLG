@@ -196,6 +196,7 @@ export function setupWebSocketServer(wss: WebSocketServer) {
             room.gateValues[gate.id] = null;
           });
           room.playerInputLog = [];
+          console.log("Sending gameStart with payload:", room);
           room.players.forEach(p => p.ws.send(JSON.stringify({ type: 'gameStart', payload: room })));
         
         } else if (data.type === 'playerInput') {
