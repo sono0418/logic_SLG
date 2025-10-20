@@ -314,6 +314,7 @@ export function setupWebSocketServer(wss: WebSocketServer) {
           const serializableGameState = createSerializableGameState(room); // ★ ステップ 2: status 設定後にシリアライズ
 
           console.log(`Game started in room ${roomId}. Status: ${room.status}`); // status をログに出力
+          console.log("!!! CHECKPOINT BEFORE SENDING GAMESTART !!!");
           console.log("Sending gameStart with serializable payload (status included):", serializableGameState.status, serializableGameState); // シリアライズ後の status もログ確認
 
           room.players.forEach((p: PlayerInternal) => p.ws.send(JSON.stringify({ // ★ ステップ 3: シリアライズしたものを送信 (1回だけ！)
