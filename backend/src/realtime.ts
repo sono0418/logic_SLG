@@ -307,6 +307,8 @@ export function setupWebSocketServer(wss: WebSocketServer) {
           });
           room.playerInputLog = [];
           // ▲▲▲ ここまで初期化 ▲▲▲
+
+
           console.log("DEBUG: About to serialize game state...");
           // ▼▼▼ シリアライズと送信 ▼▼▼
           const serializableGameState = createSerializableGameState(room); // ★ ステップ 2: status 設定後にシリアライズ
@@ -314,7 +316,6 @@ export function setupWebSocketServer(wss: WebSocketServer) {
           console.log(`Game started in room ${roomId}. Status: ${room.status}`); // status をログに出力
           console.log("Sending gameStart with serializable payload (status included):", serializableGameState.status, serializableGameState); // シリアライズ後の status もログ確認
 
-          // p の型を明示
           room.players.forEach((p: PlayerInternal) => p.ws.send(JSON.stringify({ // ★ ステップ 3: シリアライズしたものを送信 (1回だけ！)
             type: 'gameStart',
             payload: serializableGameState
