@@ -307,7 +307,7 @@ export function setupWebSocketServer(wss: WebSocketServer) {
           });
           room.playerInputLog = [];
           // ▲▲▲ ここまで初期化 ▲▲▲
-
+          console.log("DEBUG: About to serialize game state...");
           // ▼▼▼ シリアライズと送信 ▼▼▼
           const serializableGameState = createSerializableGameState(room); // ★ ステップ 2: status 設定後にシリアライズ
 
