@@ -2,7 +2,6 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { halfAdderProblems, halfAdderCircuit } from './problems'; // import は修正済みのはず
 
-console.log("realtime.ts loaded - timestamp:", Date.now());
 const allProblems = [...halfAdderProblems];
 
 // --- 型定義 ---
