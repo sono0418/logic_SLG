@@ -319,7 +319,7 @@ export function setupWebSocketServer(wss: WebSocketServer) {
             type: 'gameStart',
             payload: serializableGameState
           })));
-          // ▲▲▲ ここまでシリアライズと送信 ▲▲▲
+          // ▲▲▲ ここまでシリアライズ・送信 ▲▲▲
 
         // --- playerInput 処理 ---
         } else if (data.type === 'playerInput') {
