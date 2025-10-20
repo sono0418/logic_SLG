@@ -1,32 +1,39 @@
 // src/realtime.ts
 import { WebSocketServer, WebSocket } from "ws";
-import { halfAdderProblems, halfAdderCircuit } from './problems';
+import { halfAdderProblems, halfAdderCircuit } from './problems'; // import は修正済みのはず
 
-// --- ヘルパー関数: フロントエンド送信用に ws を除外 ---
-function createSerializableGameState(room: GameState): Omit<GameState, 'players'> & { players: Omit<GameState['players'][number], 'ws'>[] } {
-  return {
-    ...room, // room の他のプロパティはそのままコピー
-    players: room.players.map(({ ws, ...playerData }) => playerData), // players 配列から ws を除外
-  };
-}
-// --- ここまでヘルパー関数 ---
-
-// 問題セットを結合して1つの配列にする
 const allProblems = [...halfAdderProblems];
 
 // --- 型定義 ---
+type Gate = typeof halfAdderCircuit['gates'][number];
+
+// WebSocket に roomId と playerId を持たせるためのインターフェース拡張
+interface WebSocketWithIdentity extends WebSocket {
+  roomId?: string;
+  playerId?: string;
+}
+
+// プレイヤーの型 (ws を含む内部用)
+type PlayerInternal = { playerId: string, ws: WebSocketWithIdentity, playerOrder: number }; // ws の型を WebSocketWithIdentity に
+
+// プレイヤーの型 (フロントエンド送信用、ws を除く)
+type PlayerSerializable = Omit<PlayerInternal, 'ws'>;
+
+// GameState インターフェース (PlayerInternal を使用)
 export interface GameState {
   roomId: string;
-  players: { playerId: string, ws: WebSocket, playerOrder: number }[]; // ws はバックエンド内部でのみ使用
+  players: PlayerInternal[]; // ★ PlayerInternal を使用
   roundCount: number;
   teamScore: number;
   status: 'waiting' | 'inProgress' | 'ended' | 'scoring';
   hostId: string | null;
   currentQuestion: {
-    circuit: typeof halfAdderCircuit;
+    circuit: typeof halfAdderCircuit; // より具体的な型を使用
     inputAssignments: { [key: string]: boolean };
     expectedOutput: { C: boolean; S: boolean; };
     isTutorial?: boolean;
+    // mode プロパティを追加 (startGame で使用するため)
+    mode?: 'tutorial' | 'timeAttack' | 'circuitPrediction';
   };
   gateValues: { [key: string]: boolean | null };
   playerInputLog: {
@@ -39,15 +46,25 @@ export interface GameState {
   playerGateAssignments: { [playerId: string]: string[] };
 }
 
-interface WebSocketWithIdentity extends WebSocket {
-  roomId?: string;
-  playerId?: string;
-}
-// --- ここまで型定義 ---
+// フロントエンドに送る GameState の型 (players 配列の型が異なる)
+type SerializableGameState = Omit<GameState, 'players'> & { players: PlayerSerializable[] };
+
+
 
 export const gameRooms = new Map<string, GameState>();
 
+// --- ヘルパー関数: フロントエンド送信用に ws を除外 ---
+function createSerializableGameState(room: GameState): SerializableGameState { // 戻り値の型を修正
+  return {
+    ...room, // room の他のプロパティはそのままコピー
+    // p の型を明示
+    players: room.players.map(({ ws, ...playerData }: PlayerInternal): PlayerSerializable => playerData), // players 配列から ws を除外
+  };
+}
+// --- ここまでヘルパー関数 ---
+
 // --- ゲームロジック関数 ---
+// gateType の型を string | Gate['type'] などにしても良い
 function evaluateGate(gateType: string, inputs: (boolean | null)[]): boolean | null {
   if (inputs.includes(null)) return null;
   switch (gateType) {
@@ -56,28 +73,31 @@ function evaluateGate(gateType: string, inputs: (boolean | null)[]): boolean | n
     case 'OR':
       return inputs.some(input => input);
     case 'NOT':
+      // NOTゲートは入力が1つのはず
+      if (inputs.length !== 1) return null; // 不正な入力はnullを返す
       return !inputs[0];
     default:
+      console.warn(`Unknown gate type for evaluation: ${gateType}`); // 未知のゲートタイプ警告
       return null;
   }
 }
 
-// 注意: 現在の実装では generateNewQuestion は呼ばれていません。
-// scoreAndAdvanceRound 内で allProblems[room.roundCount] を使っています。
-function generateNewQuestion() {
-  const selectedProblem = allProblems[Math.floor(Math.random() * allProblems.length)];
-  return { ...selectedProblem, isTutorial: false }; // 本番用としてisTutorialをfalseに上書き
-}
+// (generateNewQuestion は未使用なので省略)
 
-function assignGatesToPlayers(players: GameState['players'], gates: GameState['currentQuestion']['circuit']['gates']) {
+// パラメータに型を追加
+function assignGatesToPlayers(players: PlayerInternal[], gates: Gate[]) {
   const assignments: { [playerId: string]: string[] } = {};
-  players.forEach(p => assignments[p.playerId] = []);
-  // stage プロパティが存在しないため、単純に順番に割り当てます
-  // もし stage に基づく割り当てが必要な場合は、gates 配列の要素に stage プロパティを追加してください
-  const sortedGates = [...gates]; // .sort((a, b) => a.stage - b.stage); // stage があればソート
+  // p の型を明示
+  players.forEach((p: PlayerInternal) => assignments[p.playerId] = []);
+  // stage プロパティがないためコメントアウト
+  const sortedGates = [...gates]; // .sort((a, b) => a.stage - b.stage);
   let playerIndex = 0;
+
   for (const gate of sortedGates) {
-    assignments[players[playerIndex].playerId].push(gate.id);
+    // プレイヤーが存在しないケースを考慮 (配列が空など)
+    if (players[playerIndex]) {
+        assignments[players[playerIndex].playerId].push(gate.id);
+    }
     playerIndex = (playerIndex + 1) % players.length;
   }
   return assignments;
@@ -86,12 +106,14 @@ function assignGatesToPlayers(players: GameState['players'], gates: GameState['c
 function scoreAndAdvanceRound(room: GameState) {
   let gateCorrectScore = 0;
   const gateScorePerCorrect = 10;
-  // 正解した入力ログのみをカウント (同じゲートへの複数回の正解入力もカウントされる可能性あり)
-  // ユニークなゲートIDごとにカウントする場合は修正が必要
-  const correctGateIds = room.playerInputLog
-      .filter(log => log.isCorrect)
-      .map(log => log.gateId);
-  gateCorrectScore = correctGateIds.length * gateScorePerCorrect;
+  const correctGateIds = new Set<string>(); // Set を使ってユニークなゲートIDのみカウント
+  room.playerInputLog.forEach(log => {
+    if (log.isCorrect) {
+      correctGateIds.add(log.gateId);
+    }
+  });
+  gateCorrectScore = correctGateIds.size * gateScorePerCorrect;
+
 
   let finalOutputScore = 0;
   const finalGateIdC = room.currentQuestion.circuit.outputs.C;
@@ -104,98 +126,100 @@ function scoreAndAdvanceRound(room: GameState) {
   }
 
   let bonusScore = 0;
-  // 全てのゲートに対して、最後の入力が正解だったかを見る (より正確な判定が必要かも)
-  const allGatesPerfect = room.currentQuestion.circuit.gates.every(gate => {
+  // gate の型を明示
+  const allGatesPerfect = room.currentQuestion.circuit.gates.every((gate: Gate) => {
+      // 該当ゲートの最後の入力ログを探す
       const lastLogForGate = room.playerInputLog.slice().reverse().find(l => l.gateId === gate.id);
+      // ログがあり、かつ正解であること
       return lastLogForGate && lastLogForGate.isCorrect;
   });
-  if (allGatesPerfect && isFinalOutputCorrect) { // 最終出力も合っている場合のみボーナス
+  if (allGatesPerfect && isFinalOutputCorrect) {
       bonusScore = 20;
   }
 
   const roundScore = gateCorrectScore + finalOutputScore + bonusScore;
   room.teamScore += roundScore;
 
-  // roundComplete はシリアライズ不要 (room 全体ではない)
-  room.players.forEach(p => p.ws.send(JSON.stringify({
+  // roundComplete 送信 (変更なし)
+  // p の型を明示
+  room.players.forEach((p: PlayerInternal) => p.ws.send(JSON.stringify({
       type: 'roundComplete',
       payload: {
-          scoreSummary: {
-              gateCorrectScore,
-              finalOutputScore,
-              bonusScore,
-              roundScore: roundScore, // 今回のラウンドスコアも追加
-              totalScore: room.teamScore,
-              isFinalOutputCorrect
-          },
-          playerInputLog: room.playerInputLog, // 採点詳細表示用
-          // currentQuestion や gateValues は nextRound で送るので不要かも？
-          currentQuestion: room.currentQuestion,
-          gateValues: room.gateValues
+        scoreSummary: {
+            gateCorrectScore,
+            finalOutputScore,
+            bonusScore,
+            roundScore: roundScore,
+            totalScore: room.teamScore,
+            isFinalOutputCorrect
+        },
+        playerInputLog: room.playerInputLog,
+        currentQuestion: room.currentQuestion,
+        gateValues: room.gateValues
       }
   })));
 
   room.roundCount++;
 
   if (room.roundCount < allProblems.length) {
-      // 次のラウンドの準備
-      const nextQuestion = allProblems[room.roundCount]; // インデックスで次の問題を選択
-      room.currentQuestion = nextQuestion as any; // 型アサーション (問題の型が一致している前提)
-      room.playerInputLog = []; // ログリセット
-      room.gateValues = { ...nextQuestion.inputAssignments }; // 入力値を設定
-      nextQuestion.circuit.gates.forEach(gate => { // ゲート出力をリセット
+      const nextQuestion = allProblems[room.roundCount];
+      room.currentQuestion = nextQuestion as any;
+      room.playerInputLog = [];
+      room.gateValues = { ...nextQuestion.inputAssignments };
+      // gate の型を明示
+      nextQuestion.circuit.gates.forEach((gate: Gate) => {
           room.gateValues[gate.id] = null;
       });
-      // プレイヤー順をシャッフル (任意)
       const shuffledPlayers = [...room.players].sort(() => 0.5 - Math.random());
-      room.players = shuffledPlayers.map((p, index) => ({ ...p, playerOrder: index + 1 })); // playerOrder も更新
-      // ゲート割り当てを再計算
+      // p の型を明示
+      room.players = shuffledPlayers.map((p: PlayerInternal, index: number) => ({ ...p, playerOrder: index + 1 }));
       room.playerGateAssignments = assignGatesToPlayers(room.players, nextQuestion.circuit.gates);
-      room.status = 'inProgress'; // scoring から inProgress に戻す
+      room.status = 'inProgress'; // status を inProgress に戻す
 
-      // === nextRound の修正箇所 ===
-      // nextRound メッセージを送信 (シリアライズ必須、1回だけ！)
+      // nextRound 送信 (変更なし)
       const serializableNextRoundState = createSerializableGameState(room);
-      room.players.forEach(p => p.ws.send(JSON.stringify({
+      // p の型を明示
+      room.players.forEach((p: PlayerInternal) => p.ws.send(JSON.stringify({
           type: 'nextRound',
-          payload: serializableNextRoundState // シリアライズしたものを送る
+          payload: serializableNextRoundState
       })));
-      // === ここまで修正 ===
-
   } else {
-      // ゲーム終了
+      // ゲーム終了 (変更なし)
       room.status = 'ended';
-      // gameEnd はシリアライズ不要 (room 全体ではない)
-      room.players.forEach(p => p.ws.send(JSON.stringify({
+      // p の型を明示
+      room.players.forEach((p: PlayerInternal) => p.ws.send(JSON.stringify({
           type: 'gameEnd',
           payload: { finalTeamScore: room.teamScore }
       })));
-      gameRooms.delete(room.roomId); // ルーム情報を削除
+      gameRooms.delete(room.roomId);
   }
 }
 // --- ここまでゲームロジック関数 ---
 
 // --- WebSocket サーバー設定 ---
 export function setupWebSocketServer(wss: WebSocketServer) {
-  wss.on('connection', ws => {
-    const wsWithId = ws as WebSocketWithIdentity;
-    console.log('Client connected.'); // 接続ログ
+  wss.on('connection', (ws: WebSocket) => { // ws の型を WebSocket に
+    const wsWithId = ws as WebSocketWithIdentity; // 型アサーション
+    console.log('Client connected.');
 
-    ws.on('message', message => {
+    ws.on('message', (message: Buffer) => { // message の型を Buffer に
       try {
-        const data = JSON.parse(message.toString());
+        const data = JSON.parse(message.toString()); // Buffer を文字列に変換してからパース
 
         // --- joinRoom 処理 ---
         if (data.type === 'joinRoom') {
           const { roomId, playerId } = data.payload;
+          if (typeof roomId !== 'string' || typeof playerId !== 'string') {
+              console.warn('Invalid joinRoom payload:', data.payload);
+              return;
+          }
           wsWithId.roomId = roomId;
           wsWithId.playerId = playerId;
           let room = gameRooms.get(roomId);
 
-          // 新規ルーム作成
           if (!room) {
-            console.log(`New room ${roomId} created with status: waiting`); // ルーム作成ログ
-            const initialQuestion = halfAdderProblems.find(p => p.isTutorial); // チュートリアル問題を検索
+            console.log(`New room ${roomId} created with status: waiting`);
+            const initialQuestion = halfAdderProblems.find(p => p.isTutorial); // 修正済み
             if (!initialQuestion) {
               console.error("No tutorial questions found.");
               ws.send(JSON.stringify({ type: 'error', payload: 'Tutorial questions not available.' }));
@@ -207,9 +231,9 @@ export function setupWebSocketServer(wss: WebSocketServer) {
               roundCount: 0,
               teamScore: 0,
               status: 'waiting',
-              hostId: playerId, // 最初のプレイヤーをホストに
+              hostId: playerId,
               currentQuestion: initialQuestion as any,
-              gateValues: {}, // 初期化は startGame で行う
+              gateValues: {},
               playerInputLog: [],
               playerGateAssignments: {},
             };
@@ -217,90 +241,85 @@ export function setupWebSocketServer(wss: WebSocketServer) {
             room = newRoom;
           }
 
-          // プレイヤーをルームに追加
-          // 既存プレイヤーチェック (任意だが推奨)
-          if (!room.players.some(p => p.playerId === playerId)) {
+          // プレイヤー追加 / 再接続処理
+          const existingPlayerIndex = room.players.findIndex((p: PlayerInternal) => p.playerId === playerId); // p の型を明示
+          if (existingPlayerIndex === -1) {
               const playerOrder = room.players.length + 1;
-              room.players.push({ playerId, ws: wsWithId, playerOrder }); // wsWithId を使う
-              console.log(`Player ${playerId} joined room ${roomId}`); // 参加ログ
+              room.players.push({ playerId, ws: wsWithId, playerOrder });
+              console.log(`Player ${playerId} joined room ${roomId}`);
           } else {
-             // 再接続などの場合の処理 (ws を更新するなど)
              console.log(`Player ${playerId} reconnected to room ${roomId}`);
-             room.players = room.players.map(p => p.playerId === playerId ? { ...p, ws: wsWithId } : p);
+             room.players[existingPlayerIndex].ws = wsWithId; // ws を更新
           }
 
-          // joinSuccess を送信 (シリアライズ不要)
+          // joinSuccess 送信 (変更なし)
           ws.send(JSON.stringify({ type: 'joinSuccess', payload: { roomId, playerId } }));
 
-          // === roomUpdate の修正箇所 ===
-          // roomUpdate を送信 (シリアライズ必須、1回だけ！)
+          // roomUpdate 送信 (変更なし)
           const serializableRoomState = createSerializableGameState(room);
-          room.players.forEach(p => p.ws.send(JSON.stringify({
-              type: 'roomUpdate', // タイプを roomUpdate に
-              payload: serializableRoomState // シリアライズしたものを送る
-          })));
-          // === ここまで修正 ===
+          // p の型を明示
+          room.players.forEach((p: PlayerInternal) => p.ws.send(JSON.stringify({ type: 'roomUpdate', payload: serializableRoomState })));
 
         // --- startGame 処理 ---
         } else if (data.type === 'startGame') {
-          const { roomId, mode } = data.payload;
-          const room = gameRooms.get(roomId);
-          // 開始条件チェック
-          if (!room) {
-             console.warn(`startGame: Room ${roomId} not found.`); return;
-          }
-          if (room.hostId !== wsWithId.playerId) { // ホストのみ開始可能
-             console.warn(`startGame: Player ${wsWithId.playerId} is not the host of room ${roomId}.`); return;
-          }
-          // プレイヤー人数チェック (チュートリアルでも2人必要か？ 仕様による -> 2人必要と仮定)
-          if (room.players.length < 2) {
-             console.warn(`startGame: Not enough players in room ${roomId}. Need at least 2.`);
-             ws.send(JSON.stringify({ type: 'error', payload: 'プレイヤーが2人以上必要です。' })); // フロントにエラー通知
+          const { roomId, mode } = data.payload; // mode も受け取る
+          // mode の型をチェック (任意)
+          if (typeof mode !== 'string' || !['tutorial', 'timeAttack', 'circuitPrediction'].includes(mode)) {
+             console.warn(`startGame: Invalid mode "${mode}" received.`);
+             ws.send(JSON.stringify({ type: 'error', payload: '無効なゲームモードです。' }));
              return;
           }
-          if (room.status !== 'waiting') {
-             console.warn(`startGame: Room ${roomId} is not in waiting status.`); return;
+
+          const room = gameRooms.get(roomId);
+          // 開始条件チェック
+          if (!room) { console.warn(`startGame: Room ${roomId} not found.`); return; }
+          if (room.hostId !== wsWithId.playerId) { console.warn(`startGame: Player ${wsWithId.playerId} is not the host of room ${roomId}.`); return; }
+          if (room.players.length < 2) { // プレイヤー人数チェック
+             console.warn(`startGame: Not enough players in room ${roomId}. Need at least 2.`);
+             ws.send(JSON.stringify({ type: 'error', payload: 'プレイヤーが2人以上必要です。' }));
+             return;
           }
+          if (room.status !== 'waiting') { console.warn(`startGame: Room ${roomId} is not in waiting status.`); return; }
 
-          room.status = 'inProgress';
-          room.roundCount = 0; // ラウンドカウント初期化
-          room.teamScore = 0; // スコア初期化
+          // ▼▼▼ ステータス設定と初期化 ▼▼▼
+          room.status = 'inProgress'; // ★ ステップ 1: status を設定
+          room.roundCount = 0;
+          room.teamScore = 0;
+          //とりまコメントアウト  room.currentQuestion.mode = mode; // mode を gameState に保存 (必要なら)
 
-          // モードに応じた問題セットを選択 (現在はチュートリアルのみ考慮)
+          // モードに応じた問題セットを選択
           const questions = mode === 'tutorial' ? allProblems.filter(p => p.isTutorial) : allProblems; // 通常モードは未実装
-          if (questions.length === 0) {
-              console.error(`No questions found for mode: ${mode}`);
-              // エラーをフロントに通知する処理を追加しても良い
-              return;
-          }
-          const initialQuestion = questions[0]; // 最初の問題を取得
+          if (questions.length === 0) { console.error(`No questions found for mode: ${mode}`); return; }
+          const initialQuestion = questions[0];
 
-          // プレイヤー順をシャッフル
+          // プレイヤーシャッフルとゲート割り当て
           const shuffledPlayers = [...room.players].sort(() => 0.5 - Math.random());
-          room.players = shuffledPlayers.map((p, index) => ({ ...p, playerOrder: index + 1 })); // playerOrder も更新
-
-          // ゲート割り当て
+          // p の型を明示
+          room.players = shuffledPlayers.map((p: PlayerInternal, index: number) => ({ ...p, playerOrder: index + 1 }));
           room.playerGateAssignments = assignGatesToPlayers(room.players, initialQuestion.circuit.gates);
 
-          // 現在の問題とゲート値を設定
+          // 現在の問題とゲート値設定
           room.currentQuestion = initialQuestion as any;
-          room.gateValues = { ...initialQuestion.inputAssignments }; // 入力値をコピー
-          initialQuestion.circuit.gates.forEach(gate => { // ゲート出力を null で初期化
+          room.gateValues = { ...initialQuestion.inputAssignments };
+          // gate の型を明示
+          initialQuestion.circuit.gates.forEach((gate: Gate) => {
             room.gateValues[gate.id] = null;
           });
-          room.playerInputLog = []; // 入力ログをリセット
+          room.playerInputLog = [];
+          // ▲▲▲ ここまで初期化 ▲▲▲
 
-          console.log(`Game started in room ${roomId}. Status: inProgress`); // 開始ログ
+          // ▼▼▼ シリアライズと送信 ▼▼▼
+          const serializableGameState = createSerializableGameState(room); // ★ ステップ 2: status 設定後にシリアライズ
 
-          // === gameStart の修正箇所 ===
-          // gameStart を送信 (シリアライズ必須、1回だけ！)
-          const serializableGameState = createSerializableGameState(room);
-          console.log("Sending gameStart with serializable payload:", serializableGameState); // 送信ログ
-          room.players.forEach(p => p.ws.send(JSON.stringify({
-              type: 'gameStart',
-              payload: serializableGameState // シリアライズしたものを送る
+          console.log(`Game started in room ${roomId}. Status: ${room.status}`); // status をログに出力
+          console.log("Sending gameStart with serializable payload (status included):", serializableGameState.status, serializableGameState); // シリアライズ後の status もログ確認
+
+          // p の型を明示
+          room.players.forEach((p: PlayerInternal) => p.ws.send(JSON.stringify({ // ★ ステップ 3: シリアライズしたものを送信 (1回だけ！)
+            type: 'gameStart',
+            payload: serializableGameState
           })));
-          // === ここまで修正 ===
+          // ▲▲▲ ここまでシリアライズと送信 ▲▲▲
 
         // --- playerInput 処理 ---
         } else if (data.type === 'playerInput') {
@@ -308,121 +327,90 @@ export function setupWebSocketServer(wss: WebSocketServer) {
           const room = gameRooms.get(roomId);
 
           // 入力検証
-          if (!room || room.status !== 'inProgress') {
-            console.warn(`playerInput denied: Room ${roomId} not found or not in progress.`); return;
-          }
+          if (!room || room.status !== 'inProgress') { console.warn(`playerInput denied: Room ${roomId} not found or not in progress.`); return; }
           const playerAssignments = room.playerGateAssignments[playerId];
-          // 担当外のゲート、または既に解決済みのゲートへの入力を弾く
-          if (!playerAssignments || !playerAssignments.includes(gateId)) {
-            console.warn(`playerInput denied: Gate ${gateId} not assigned to player ${playerId}.`); return;
-          }
-          // 既に値が入っている場合は入力を無視（もしくはエラーを返す）
-          if (room.gateValues[gateId] !== null) {
-            console.warn(`playerInput denied: Gate ${gateId} already resolved.`);
-            // 必要ならフロントにエラーメッセージを送る
-            // ws.send(JSON.stringify({ type: 'error', payload: `ゲート ${gateId} は解決済みです。` }));
-            return;
-          }
+          if (!playerAssignments || !playerAssignments.includes(gateId)) { console.warn(`playerInput denied: Gate ${gateId} not assigned to player ${playerId}.`); return; }
+          if (room.gateValues[gateId] !== null) { console.warn(`playerInput denied: Gate ${gateId} already resolved.`); return; }
 
-
-          const currentGate = room.currentQuestion.circuit.gates.find(g => g.id === gateId);
-          if (!currentGate) {
-            console.error(`playerInput error: Gate ${gateId} not found in current question.`); return;
-          }
+          // gate の型を明示
+          const currentGate = room.currentQuestion.circuit.gates.find((g: Gate) => g.id === gateId);
+          if (!currentGate) { console.error(`playerInput error: Gate ${gateId} not found in current question.`); return; }
 
           // 正誤判定
           const inputValues = currentGate.inputs.map(input => room.gateValues[input]);
           const correctOutput = evaluateGate(currentGate.type, inputValues);
-          // correctOutput が null の場合 (入力がまだ揃っていない) は isCorrect = false とする
           const isCorrect = correctOutput !== null && inputValue === correctOutput;
 
-          // 入力ログを追加
-          room.playerInputLog.push({
-            playerId,
-            gateId,
-            inputValue,
-            isCorrect,
-            timestamp: Date.now()
-          });
+          room.playerInputLog.push({ playerId, gateId, inputValue, isCorrect, timestamp: Date.now() });
 
-          // 正解ならゲート値を更新
           if (isCorrect) {
             room.gateValues[gateId] = inputValue;
-            console.log(`Player ${playerId} correctly resolved gate ${gateId} with ${inputValue}`); // 正解ログ
+            console.log(`Player ${playerId} correctly resolved gate ${gateId} with ${inputValue}`);
           } else {
-             console.log(`Player ${playerId} incorrectly resolved gate ${gateId} with ${inputValue}`); // 不正解ログ
-             // 不正解の場合のペナルティなどをここに追加可能
+             console.log(`Player ${playerId} incorrectly resolved gate ${gateId} with ${inputValue}`);
           }
 
-          // === gameStateUpdate の修正箇所 ===
-          // gameStateUpdate を送信 (シリアライズ必須、1回だけ！)
+          // gameStateUpdate 送信 (変更なし)
           const serializableUpdateState = createSerializableGameState(room);
-          room.players.forEach(p => p.ws.send(JSON.stringify({
-              type: 'gameStateUpdate',
-              payload: serializableUpdateState // シリアライズしたものを送る
-          })));
-          // === ここまで修正 ===
+          // p の型を明示
+          room.players.forEach((p: PlayerInternal) => p.ws.send(JSON.stringify({ type: 'gameStateUpdate', payload: serializableUpdateState })));
 
           // 全ゲート完了チェック
-          const allGatesCompleted = room.currentQuestion.circuit.gates.every(gate => room.gateValues[gate.id] !== null);
+          // gate の型を明示
+          const allGatesCompleted = room.currentQuestion.circuit.gates.every((gate: Gate) => room.gateValues[gate.id] !== null);
           if (allGatesCompleted) {
-            console.log(`All gates completed for round ${room.roundCount} in room ${roomId}. Moving to scoring.`); // ラウンド完了ログ
+            console.log(`All gates completed for round ${room.roundCount} in room ${roomId}. Moving to scoring.`);
             room.status = 'scoring';
-            scoreAndAdvanceRound(room); // スコア計算と次のラウンドへ
+            scoreAndAdvanceRound(room);
           }
-        // --- selectGameMode は廃止 ---
         } else if (data.type === 'selectGameMode') {
-          // このイベントは startGame に統合されたため、何もしない
           console.warn('Received deprecated selectGameMode event.');
         } else {
-          console.warn(`Unknown message type received: ${data.type}`); // 未知のメッセージタイプ
+          console.warn(`Unknown message type received: ${data.type}`);
         }
       } catch (error) {
         console.error('WebSocket message processing error:', error);
-        // エラー発生時にクライアントに通知する (任意)
         ws.send(JSON.stringify({ type: 'error', payload: 'An internal server error occurred.' }));
       }
     });
 
     // --- 接続終了処理 ---
     ws.on('close', () => {
-      console.log(`Client disconnected: ${wsWithId.playerId || 'Unknown'}`); // 切断ログ
+      console.log(`Client disconnected: ${wsWithId.playerId || 'Unknown'}`);
       if (wsWithId.roomId && wsWithId.playerId) {
         const room = gameRooms.get(wsWithId.roomId);
         if (room) {
-          // プレイヤーをリストから削除
-          room.players = room.players.filter(p => p.playerId !== wsWithId.playerId);
-          console.log(`Player ${wsWithId.playerId} removed from room ${wsWithId.roomId}. Remaining: ${room.players.length}`); // 削除ログ
+          // p の型を明示
+          room.players = room.players.filter((p: PlayerInternal) => p.playerId !== wsWithId.playerId);
+          console.log(`Player ${wsWithId.playerId} removed from room ${wsWithId.roomId}. Remaining: ${room.players.length}`);
 
-          // ルームが空になったら削除
           if (room.players.length === 0) {
-            console.log(`Room ${wsWithId.roomId} is empty, deleting.`); // ルーム削除ログ
+            console.log(`Room ${wsWithId.roomId} is empty, deleting.`);
             gameRooms.delete(wsWithId.roomId);
           } else {
-            // ホストが抜けたら新しいホストを設定 (最初のプレイヤーを仮ホストに)
             if (room.hostId === wsWithId.playerId) {
-              room.hostId = room.players[0]?.playerId || null; // 新しいホストIDを設定
-              console.log(`Host left. New host of room ${wsWithId.roomId}: ${room.hostId}`); // ホスト変更ログ
+              room.hostId = room.players[0]?.playerId || null;
+              console.log(`Host left. New host of room ${wsWithId.roomId}: ${room.hostId}`);
             }
-            // プレイヤー順序を更新 (任意だが推奨)
-            room.players.forEach((p, index) => p.playerOrder = index + 1);
+            // p の型を明示
+            room.players.forEach((p: PlayerInternal, index: number) => p.playerOrder = index + 1);
 
-            // 他のプレイヤーに roomUpdate を送信 (シリアライズ必須)
+            // roomUpdate 送信 (変更なし)
             const serializableCloseState = createSerializableGameState(room);
-            room.players.forEach(p => p.ws.send(JSON.stringify({ type: 'roomUpdate', payload: serializableCloseState })));
+            // p の型を明示
+            room.players.forEach((p: PlayerInternal) => p.ws.send(JSON.stringify({ type: 'roomUpdate', payload: serializableCloseState })));
           }
         }
       }
     });
 
     // --- エラー処理 ---
-    ws.on('error', (error) => {
-       console.error(`WebSocket error for client ${wsWithId.playerId || 'Unknown'}:`, error); // エラーログ
-       // 必要に応じて接続切断処理などをここで行う
+    ws.on('error', (error: Error) => { // error の型を明示
+       console.error(`WebSocket error for client ${wsWithId.playerId || 'Unknown'}:`, error);
     });
 
   });
 
-  console.log('WebSocket server setup complete.'); // サーバー起動ログ
+  console.log('WebSocket server setup complete.');
 }
 // --- ここまで WebSocket サーバー設定 ---
