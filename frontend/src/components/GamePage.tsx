@@ -6,8 +6,8 @@ import { PlayerIdContext } from '../contexts/PlayerIdContext';
 import PopUpB from './Popups/PopUpB';
 import PopUpC from './Popups/PopUpC';
 import './GamePage.css';
-import GameComponent from './GameComponent';
-import TutorialPage from './TutorialPage';
+//import GameComponent from './GameComponent';
+//0import TutorialPage from './TutorialPage';
 
 
 

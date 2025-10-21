@@ -264,6 +264,7 @@ export function setupWebSocketServer(wss: WebSocketServer) {
 
         // --- startGame 処理 ---
         } else if (data.type === 'startGame') {
+          console.log("!!! startGame function WAS CALLED !!!");
           const { roomId, mode } = data.payload; // mode も受け取る
           // mode の型をチェック (任意)
           if (typeof mode !== 'string' || !['tutorial', 'timeAttack', 'circuitPrediction'].includes(mode)) {
