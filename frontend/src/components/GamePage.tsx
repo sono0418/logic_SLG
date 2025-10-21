@@ -9,6 +9,8 @@ import './GamePage.css';
 import GameComponent from './GameComponent';
 import TutorialPage from './TutorialPage';
 
+
+
 const GamePage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const myPlayerId = useContext(PlayerIdContext);
@@ -83,7 +85,10 @@ const GamePage: React.FC = () => {
     if (!gameState.playerChoices) {
       return []; // playerChoicesがなければ空の配列を返す
     }
-    return gameState.players.filter(p => gameState.playerChoices[p.playerId] === mode);
+    const choices = gameState.playerChoices;
+    return gameState.players.filter(p => {
+      return choices && choices[p.playerId] == mode;
+    });
   };
 
   return (
