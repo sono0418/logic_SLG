@@ -20,6 +20,7 @@ export interface GameState {
   teamScore: number;
   status: 'waiting' | 'inProgress' | 'ended' | 'scoring';
   hostId: string | null;
+  playerChoices?: { [playerId: string]: 'tutorial' | 'timeAttack' | 'circuitPrediction' }; // ? を付けてオプショナルにする
   currentQuestion: {
     circuit: {
       gates: any[]; // 必要なら Gate 型を定義
@@ -97,7 +98,6 @@ export const useGameWebSocket = (roomId: string | undefined, playerId: string | 
              }
              break;
           case 'gameStart': // gameStart を分離してログ追加
-             // ▼▼▼ gameStart 受信 & setGameState 直前のログ ▼▼▼
              console.log(`[WebSocket Hook] Received gameStart. Calling setGameState with payload (status should be here):`, message.payload?.status, message.payload);
               // ペイロードが null や undefined でないことを確認 (任意)
              if (message.payload) {

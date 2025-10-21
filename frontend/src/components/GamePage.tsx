@@ -83,7 +83,7 @@ const GamePage: React.FC = () => {
     if (!gameState.playerChoices) {
       return []; // playerChoicesがなければ空の配列を返す
     }
-    return gameState.players.filter(p => gameState.playerChoices[p.id] === mode);
+    return gameState.players.filter(p => gameState.playerChoices[p.playerId] === mode);
   };
 
   return (
@@ -103,7 +103,7 @@ const GamePage: React.FC = () => {
               <div className="voters">
                 {/* Display only players who chose Tutorial */}
                 {getPlayersForMode('tutorial').map(p => (
-                  <span key={p.id} className="selector-icon">{p.playerOrder}P</span>
+                  <span key={p.playerId} className="selector-icon">{p.playerOrder}P</span>
                 ))}
               </div>
             </button>
@@ -114,7 +114,7 @@ const GamePage: React.FC = () => {
               <div className="voters">
                 {/* Display only players who chose Time Attack */}
                 {getPlayersForMode('timeAttack').map(p => (
-                  <span key={p.id} className="selector-icon">{p.playerOrder}P</span>
+                  <span key={p.playerId} className="selector-icon">{p.playerOrder}P</span>
                 ))}
               </div>
             </button>
@@ -125,7 +125,7 @@ const GamePage: React.FC = () => {
               <div className="voters">
                 {/* Display only players who chose Circuit Prediction */}
                 {getPlayersForMode('circuitPrediction').map(p => (
-                  <span key={p.id} className="selector-icon">{p.playerOrder}P</span>
+                  <span key={p.playerId} className="selector-icon">{p.playerOrder}P</span>
                 ))}
               </div>
             </button>
