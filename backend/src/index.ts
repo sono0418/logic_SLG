@@ -5,6 +5,7 @@ import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 // problems.ts から問題データをインポート
 import { halfAdderProblems, halfAdderCircuit } from './problems';
+import fs from 'fs';
 
 // 問題セットを結合して1つの配列にする (チュートリアル以外も含む場合)
 // 現在はチュートリアル問題のみ使用する想定
@@ -25,6 +26,21 @@ type PlayerInternal = { playerId: string, ws: WebSocketWithIdentity, playerOrder
 
 // プレイヤーの型 (フロントエンド送信用、ws を除く)
 type PlayerSerializable = { playerId: string, playerOrder: number }; // ws を除く + playerId に名前を修正
+
+//ランキング周り
+const RANKING_CSV_PATH = path.join(__dirname, 'data', 'rankings.csv');
+const DATA_DIR = path.join(__dirname, 'data');
+
+// data ディレクトリがなければ作成する (サーバー起動時)
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR);
+  console.log(`Created data directory at: ${DATA_DIR}`);
+}
+// CSV ファイルがなければヘッダー行を作成する (サーバー起動時)
+if (!fs.existsSync(RANKING_CSV_PATH)) {
+  fs.writeFileSync(RANKING_CSV_PATH, 'timestamp,teamName,score,playerId\n');
+  console.log(`Created ranking CSV file with header at: ${RANKING_CSV_PATH}`);
+}
 
 // GameState インターフェース (PlayerInternal を使用)
 export interface GameState {
@@ -208,9 +224,13 @@ function scoreAndAdvanceRound(room: GameState) {
   } else {
       // ゲーム終了
       room.status = 'ended';
+      const isTutorialComplete = room.currentQuestion?.isTutorial ?? false; 
       room.players.forEach((p: PlayerInternal) => p.ws.send(JSON.stringify({
           type: 'gameEnd',
-          payload: { finalTeamScore: room.teamScore }
+          payload: { 
+            finalTeamScore: room.teamScore,
+            isTutorialComplete: isTutorialComplete
+           }
       })));
       gameRooms.delete(room.roomId); // ルーム削除
   }
@@ -403,44 +423,67 @@ wss.on('connection', (ws: WebSocket) => {
 
       // --- selectGameMode 処理 ---
       }else if (data.type === 'selectGameMode') {
-  const { roomId, playerId, mode } = data.payload;
+        const { roomId, playerId, mode } = data.payload;
 
-  // mode のバリデーション
-  if (typeof mode !== 'string' || !['tutorial', 'timeAttack', 'circuitPrediction'].includes(mode)) {
-      console.warn(`selectGameMode: Invalid mode "${mode}" received.`);
-      ws.send(JSON.stringify({ type: 'error', payload: '無効なゲームモードが選択されました。' }));
-      return; // ★ 無効ならここで処理を抜ける
+        // mode のバリデーション
+      if (typeof mode !== 'string' || !['tutorial', 'timeAttack', 'circuitPrediction'].includes(mode)) {
+        console.warn(`selectGameMode: Invalid mode "${mode}" received.`);
+        ws.send(JSON.stringify({ type: 'error', payload: '無効なゲームモードが選択されました。' }));
+        return; // ★ 無効ならここで処理を抜ける
+      }
+     
+      // ★ ここから下では mode は 'tutorial' | 'timeAttack' | 'circuitPrediction' のいずれかのはず
+      const room = gameRooms.get(roomId);
+      if (!room || room.status !== 'waiting') {
+        console.log(`selectGameMode denied. Room status: ${room?.status}`);
+        return;
+      }
+
+      // playerChoices を更新
+      if (!room.playerChoices) room.playerChoices = {};
+
+      // ▼▼▼ ここで型アサーションを追加 ▼▼▼
+      room.playerChoices[playerId] = mode as 'tutorial' | 'timeAttack' | 'circuitPrediction';
+    
+      console.log(`Player ${playerId} selected mode ${mode} in room ${roomId}`);
+
+      // roomUpdate 送信
+      const serializableRoomState = createSerializableState(room);
+      room.players.forEach((p: PlayerInternal) => {
+        p.ws.send(JSON.stringify({ type: 'roomUpdate', payload: serializableRoomState }));
+      });
+      } else if (data.type === 'registerScore') {
+        const { teamName, score, playerId } = data.payload;
+        // 簡単なバリデーション
+        if (typeof teamName === 'string' && typeof score === 'number' && typeof playerId === 'string' && teamName.trim()) {
+          const timestamp = Date.now();
+          // CSV に追記するデータ行 (改行コード \n を忘れずに)
+          const csvRow = `${timestamp},"${teamName.replace(/"/g, '""')}","${score}","${playerId}"\n`; // 名前中の " をエスケープ
+
+          // 非同期でファイルに追記
+          fs.appendFile(RANKING_CSV_PATH, csvRow, (err) => {
+        if (err) {
+          console.error(`Failed to write score to CSV for player ${playerId}:`, err);
+          // エラーをクライアントに通知
+          ws.send(JSON.stringify({ type: 'error', payload: 'スコアの登録に失敗しました。' }));
+        } else {
+          console.log(`Score registered for player ${playerId}: ${teamName}, ${score}`);
+          // 成功をクライアントに通知 (任意)
+          ws.send(JSON.stringify({ type: 'scoreRegistered', payload: { success: true } }));
+        }
+    });
+  } else {
+    console.warn(`Invalid registerScore payload received from ${playerId}:`, data.payload);
+    ws.send(JSON.stringify({ type: 'error', payload: 'スコア登録データが無効です。' }));
   }
-  // ★ ここから下では mode は 'tutorial' | 'timeAttack' | 'circuitPrediction' のいずれかのはず
-
-  const room = gameRooms.get(roomId);
-
-  if (!room || room.status !== 'waiting') {
-      console.log(`selectGameMode denied. Room status: ${room?.status}`);
-      return;
-  }
-
-  // playerChoices を更新
-  if (!room.playerChoices) room.playerChoices = {};
-
-  // ▼▼▼ ここで型アサーションを追加 ▼▼▼
-  room.playerChoices[playerId] = mode as 'tutorial' | 'timeAttack' | 'circuitPrediction';
-  // ▲▲▲ ここで型アサーションを追加 ▲▲▲
-
-  console.log(`Player ${playerId} selected mode ${mode} in room ${roomId}`);
-
-  // roomUpdate 送信
-  const serializableRoomState = createSerializableState(room);
-  room.players.forEach((p: PlayerInternal) => {
-      p.ws.send(JSON.stringify({ type: 'roomUpdate', payload: serializableRoomState }));
-  });
-} else {
+}
+else {
           console.warn(`Unknown message type received: ${data.type}`);
       }
-    } catch (error) {
-      console.error('WebSocket message processing error:', error);
-      ws.send(JSON.stringify({ type: 'error', payload: 'An internal server error occurred.' }));
-    }
+      } catch (error) {
+        console.error('WebSocket message processing error:', error);
+        ws.send(JSON.stringify({ type: 'error', payload: 'An internal server error occurred.' }));
+      }
   });
 
   // --- close 処理 ---

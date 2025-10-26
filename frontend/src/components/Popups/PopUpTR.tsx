@@ -4,6 +4,8 @@ import React from 'react';
 interface ResultPopupProps {
   score: number;
   onClose: () => void;
+  title: string;
+  children?: React.ReactNode; // ← この行を追加 (children を受け取れるようにする)
 }
 
 const ResultPopup: React.FC<ResultPopupProps> = ({ score, onClose }) => (
