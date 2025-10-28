@@ -1,5 +1,6 @@
 // src/components/Popups/PopUpB.tsx
 import React, { useState } from 'react';
+import './PopUp.css';
 
 // 親から渡されるPropsの型を定義
 interface PopUpProps {

@@ -1,22 +1,26 @@
+/* src/components/GamePage.css */
+
 /* --- 全体のコンテナとレイアウト --- */
 .game-selection-container {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background-color: #E5DECA; /* ダークな背景色 */
-  color: #470000; /* 基本の文字色 */
-  font-family: 'Inter', 'Yu Gothic UI', sans-serif;
-  overflow: hidden;
+  background-color: #E5DECA; /* 背景色 */
+  color: #470000; /* 基本文字色 */
+  font-family: 'Inter', 'Yu Gothic UI', sans-serif; /* フォント */
+  overflow: hidden; /* はみ出し防止 */
 }
 
 /* --- ヘッダー --- */
 .page-header {
   padding: 1rem 2rem;
-  background-color: #25282e;
-  border-bottom: 1px solid #3a3f47;
+  background-color: #470000; /* ヘッダー背景色 */
+  color: #E5DECA; /* ヘッダー文字色 */
+  border-bottom: 3px solid #7a3a3a; /* 区切り線 */
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-shrink: 0; /* ヘッダーが縮まないように */
 }
 
 .room-id-display {
@@ -26,14 +30,14 @@
 }
 
 .room-id-display span {
-  font-size: 1rem;
+  font-size: 1.1rem; /* 少し大きく */
   font-weight: 500;
-  color: #aaa;
+  color: #E5DECA; /* 文字色を調整 */
 }
 
 .room-id-display button {
-  background-color: #3a3f47;
-  color: #e0e0e0;
+  background-color: #7a3a3a; /* ボタン背景色 */
+  color: #E5DECA; /* ボタン文字色 */
   border: none;
   padding: 0.5rem 1rem;
   border-radius: 5px;
@@ -42,7 +46,7 @@
 }
 
 .room-id-display button:hover {
-  background-color: #4a4f57;
+  background-color: #9c4d4d; /* ホバー色 */
 }
 
 
@@ -53,8 +57,9 @@
   flex-direction: column;
   justify-content: center; /* 垂直方向中央揃え */
   align-items: center; /* 水平方向中央揃え */
-  gap: 3rem;
+  gap: 3rem; /* 各セクション間の余白 */
   padding: 2rem;
+  overflow-y: auto; /* コンテンツが多い場合にスクロール */
 }
 
 /* --- ゲームモード選択 --- */
@@ -62,40 +67,46 @@
   text-align: center;
 }
 
+.game-mode-section h2 { /* 見出しスタイル */
+  margin-bottom: 1.5rem;
+  font-size: 1.8rem;
+}
+
 .mode-options {
   display: flex;
-  gap: 1.5rem;
-  margin-top: 1.5rem;
+  justify-content: center; /* 中央揃え */
+  gap: 1.5rem; /* ボタン間の余白 */
+  flex-wrap: wrap; /* 画面幅が狭い場合に折り返す */
 }
 
 .mode-option {
-  position: relative;
-  background-color: transparent;
-  border: 2px solid #3a3f47;
-  color: #e0e0e0;
-  padding: 2rem 3rem;
+  position: relative; /* voters の位置基準 */
+  background-color: transparent; /* 背景色は下の色指定で上書き */
+  border: 3px solid #470000; /* 枠線を太く */
+  color: #470000; /* 文字色 */
+  padding: 1.5rem 2.5rem; /* パディング調整 */
   border-radius: 8px;
   font-size: 1.25rem;
   font-weight: bold;
   cursor: pointer;
   transition: all 0.2s ease-in-out;
+  min-width: 200px; /* 最低幅 */
 }
 
-.mode-option:hover {
-  border-color: #00ff9b;
-  color: #00ff9b;
-}
-
+/* 選択されているモード */
 .mode-option.my-choice {
-  border-color: #00ff9b;
-  box-shadow: 0 0 15px rgba(0, 255, 155, 0.3);
-  transform: translateY(-5px);
+  /* background-color を変更するか、枠線を太くするなど目立たせる */
+  border-width: 5px; /* 枠線を太く */
+  transform: translateY(-3px); /* 少し上に移動 */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* 影 */
+  /* 色は下の .btn-* で指定される */
 }
 
+/* 投票者アイコン */
 .voters {
   position: absolute;
-  top: -10px;
-  right: -10px;
+  top: -12px; /* 位置調整 */
+  right: -12px;
   display: flex;
   gap: 0.3rem;
 }
@@ -104,14 +115,15 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 24px;
-  height: 24px;
-  background-color: #00ff9b;
-  color: #1a1d21;
+  width: 28px; /* 少し大きく */
+  height: 28px;
+  background-color: #470000; /* 背景色 */
+  color: #E5DECA; /* 文字色 */
   border-radius: 50%;
-  font-size: 0.8rem;
+  font-size: 0.9rem; /* 少し大きく */
   font-weight: bold;
-  border: 2px solid #1a1d21;
+  border: 2px solid #E5DECA; /* 枠線 */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* 影 */
 }
 
 /* --- 操作ボタンエリア --- */
@@ -119,30 +131,42 @@
   display: flex;
   gap: 2rem;
   align-items: center;
+  flex-wrap: wrap; /* 折り返し */
+  justify-content: center; /* 中央揃え */
+  width: 100%; /* 幅いっぱい */
+  max-width: 800px; /* 最大幅 (任意) */
+  margin-top: 1rem; /* 上の要素との間に少し余白 */
+}
+
+.utility-buttons {
+  display: flex;
+  gap: 1rem; /* ボタン間の余白 */
 }
 
 .utility-buttons button {
-  background-color: #3a3f47;
-  color: #e0e0e0;
+  /* background-color は下の色指定で上書き */
+  color: white;
   border: none;
   padding: 0.75rem 1.25rem;
   border-radius: 5px;
-  margin: 0 0.5rem;
   cursor: pointer;
-  transition: background-color 0.2s;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: background-color 0.2s, transform 0.1s;
 }
 
 .utility-buttons button:hover {
-  background-color: #4a4f57;
+  transform: translateY(-2px); /* ホバー時に少し浮く */
 }
 
+/* はじめるボタンエリア */
 .start-section {
   text-align: center;
 }
 
 .start-button {
-  background-color: #00ff9b;
-  color: #1a1d21;
+  /* background-color は下の色指定で上書き */
+  color: white; /* 文字色 */
   border: none;
   padding: 1rem 3rem;
   border-radius: 8px;
@@ -154,55 +178,125 @@
 
 .start-button:hover:not(:disabled) {
   transform: scale(1.05);
-  box-shadow: 0 0 20px rgba(0, 255, 155, 0.5);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3); /* 影を濃く */
 }
 
 .start-button:disabled {
-  background-color: #3a3f47;
-  color: #666;
+  background-color: #a0a0a0 !important; /* 無効時の背景色 (重要度を上げて上書き) */
+  color: #666 !important; /* 無効時の文字色 */
   cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 .host-notice {
   margin-top: 0.5rem;
   font-size: 0.8rem;
-  color: #888;
+  color: #6e5e5e; /* 少し濃い色に */
+}
+
+/* --- ボタンの色指定 --- */
+
+/* 赤色グループ (#C77665) */
+.mode-option.btn-red,
+.utility-buttons .btn-red,
+.start-button.btn-red {
+  background-color: #C77665;
+  border-color: #C77665; /* 枠線の色 */
+  color: white;
+}
+.mode-option.btn-red:hover:not(.my-choice),
+.utility-buttons .btn-red:hover,
+.start-button.btn-red:hover:not(:disabled) {
+  background-color: #a85f50; /* ホバー色 */
+  border-color: #a85f50;
+}
+.mode-option.my-choice.btn-red { /* 選択中の赤ボタン */
+   border-color: #a85f50; /* 濃い赤の枠線 */
+   background-color: #C77665; /* 背景色は維持 */
+}
+
+/* 緑色グループ (#7E9374) */
+.mode-option.btn-green,
+.utility-buttons .btn-green {
+  background-color: #7E9374;
+  border-color: #7E9374;
+  color: white;
+}
+.mode-option.btn-green:hover:not(.my-choice),
+.utility-buttons .btn-green:hover {
+  background-color: #6a7c61;
+  border-color: #6a7c61;
+}
+.mode-option.my-choice.btn-green {
+   border-color: #6a7c61;
+   background-color: #7E9374;
+}
+
+/* 青色グループ (#729CA6) */
+.mode-option.btn-blue,
+.utility-buttons .btn-blue {
+  background-color: #729CA6;
+  border-color: #729CA6;
+  color: white;
+}
+.mode-option.btn-blue:hover:not(.my-choice),
+.utility-buttons .btn-blue:hover {
+  background-color: #5c818a;
+  border-color: #5c818a;
+}
+.mode-option.my-choice.btn-blue {
+   border-color: #5c818a;
+   background-color: #729CA6;
 }
 
 
 /* --- フッター (プレイヤー表示) --- */
 .page-footer {
-  padding: 1rem;
-  background-color: #25282e;
-  border-top: 1px solid #3a3f47;
+  padding: 1.5rem 1rem; /* 少し広めに */
+  background-color: #7a3a3a; /* フッター背景色 */
+  color: #E5DECA; /* フッター文字色 */
+  border-top: 3px solid #470000;
+  flex-shrink: 0; /* フッターが縮まないように */
 }
 
 .player-status-section {
   width: 100%;
+  max-width: 900px; /* 最大幅 (任意) */
+  margin: 0 auto; /* 中央揃え */
+  text-align: center;
+}
+
+.player-status-section h2 { /* 見出しスタイル */
+  margin-bottom: 1rem;
+  font-size: 1.3rem;
 }
 
 .player-slots {
   display: flex;
   justify-content: center;
-  gap: 1rem;
+  gap: 1rem; /* スロット間の余白 */
+  flex-wrap: wrap; /* 折り返し */
 }
 
 .player-slot {
-  width: 120px;
+  width: 140px; /* 少し広く */
   padding: 1rem;
-  background-color: #3a3f47;
+  background-color: #470000; /* スロット背景色 */
   border-radius: 8px;
   text-align: center;
-  border: 2px solid transparent;
+  border: 3px solid #7a3a3a; /* 枠線 */
   transition: all 0.3s;
 }
 
 .player-slot.inactive {
-  opacity: 0.4;
+  opacity: 0.5; /* 少し濃く */
+  border-style: dashed; /* 破線にするなど */
 }
 
 .player-slot.active {
-  border-color: #00ff9b;
+  /* アクティブなプレイヤーの特別なスタイルは不要かも */
+  /* border-color: #E5DECA; */ /* 白っぽい枠線など */
 }
 
 .player-order-label {
@@ -214,4 +308,11 @@
 
 .player-name {
   font-size: 0.9rem;
+  word-break: break-all; /* 長い名前の場合に折り返す */
+}
+
+/* 自分のプレイヤースロットを強調 (任意) */
+.player-name.my-player {
+  font-weight: bold;
+  /* color: yellow; */ /* 色を変えるなど */
 }
