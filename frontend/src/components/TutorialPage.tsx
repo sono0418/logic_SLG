@@ -9,14 +9,7 @@ import PopUpB from './Popups/PopUpB'; // ノート用ポップアップ
 import PopUpTR from './Popups/PopUpTR'; // 結果表示用ポップアップ
 import './TutorialPage.css'; // スタイルシート
 
-// GamePage から gameState と sendMessage を受け取るための Props 型定義
-interface TutorialPageProps {
-    gameState: GameState | null; // null の可能性を考慮
-    sendMessage: (type: string, payload: object) => void;
-}
-
-// problems.ts から Gate 型を import するか、ここで定義する
-// ここでは仮に any としますが、可能なら import または定義してください
+// ここでは仮に any
 type Gate = any; // typeof halfAdderCircuit['gates'][number];
 
 // ゲートの入力値を取得するヘルパー関数 (必要なら)
@@ -28,11 +21,12 @@ type Gate = any; // typeof halfAdderCircuit['gates'][number];
 //     }));
 // };
 
-const TutorialPage: React.FC<TutorialPageProps> = ({ gameState, sendMessage }) => {
+const TutorialPage: React.FC = () => {
     // URL パラメータから roomId を取得
     const { roomId } = useParams<{ roomId: string }>();
     const navigate = useNavigate(); // 画面遷移用フック
     const myPlayerId = useContext(PlayerIdContext); // 自分のプレイヤーID
+    const { gameState, sendMessage } = useGameWebSocket(roomId, myPlayerId);
 
     // --- State定義 ---
     const [isNotePopupOpen, setNotePopupOpen] = useState(false); // ノートポップアップ表示状態
@@ -135,7 +129,7 @@ const TutorialPage: React.FC<TutorialPageProps> = ({ gameState, sendMessage }) =
     if (!gameState || !myPlayerId) {
         // GamePage から遷移してきた直後は gameState がまだ古い可能性もあるため考慮
         console.warn("TutorialPage rendered without gameState or myPlayerId");
-        return <div>ゲーム情報を読み込み中...</div>;
+        return <div>ゲーム情報を読み込み中...(TutorialPage)</div>;
     }
 
     // 自分の担当ゲート、現在の担当ゲート、自分のターンかどうかの判定
